@@ -1,0 +1,131 @@
+info: [INFO] === OmniScope IR Analysis ===
+
+
+info: [INFO] File: /Users/scc/code/ffi-demo/output/cpp_fft.bc
+
+
+
+info: [INFO] Loaded: 12 functions
+
+
+
+info: [INFO] LANG-DETECT: module language = cpp, confidence = 100.0%, method = sampling
+
+info: [32m[INFO][0m ReturnCheck: Analyzed functions, found 0 unchecked return values
+
+info: [32m[INFO][0m RustFfiFilter: analyzed 4 funcs, 0 findings (0 stack escapes)
+
+info: [32m[INFO][0m CallGraph: extracted 15 cross-language edges
+
+info: [32m[INFO][0m CallGraph: built semantics CallGraph with 12 nodes, 17 edges for BFS traversal
+
+info: [32m[INFO][0m IntegerOverflow: Analyzed functions, found 0 potential overflows
+
+info: [32m[INFO][0m FFITypeMismatch: analyzed 17 calls, found 15 FFI boundaries, 0 issues
+
+info: [33m[WARN][0m [P1-1] DangerSurfacePass: MemoryGraph is empty despite ptr-lifetime dep — ptr-lifetime may have skipped this module
+
+info: [32m[INFO][0m [P1-1] DangerSurfacePass: 15 FFI, 0 allocs, 0 funcs | Phase1=0ms (args=0 rets=0 alias_traces=0) Phase2=0ms (cross_lang_free=0)
+
+info: [32m[INFO][0m CallbackEscape: analyzed 0 funcs, 0 cgo boundaries, 0 issues found
+
+info: [32m[INFO][0m FFIBoundary: consuming 15 cross-language edges from CallGraph
+
+info: [32m[INFO][0m FFIBoundary: 0/4 funcs analyzed, 4 skipped (irrelevant), 0 issues generated
+
+info: [32m[INFO][0m BufferOverflow: No buffer overflow issues detected
+
+info: [32m[INFO][0m TIP: Rebuild with -g for file/line diagnostics
+
+info: [32m[INFO][0m PointerOwnership: Source 1 (MemoryGraph) — 1 unfreed + 0 freed = 1 total nodes
+
+info: [32m[INFO][0m PointerOwnership: Source 2 (GlobalAllocTracker) — 0 records, 0 freed
+
+info: [32m[INFO][0m PointerOwnership: Source 3 (IR scan) added 0 frees — total now 0
+
+info: [32m[INFO][0m PointerOwnership: Pre-populated from MemoryGraph + GlobalAllocTracker + IR-scan — 1 allocs, 0 frees
+
+info: [33m[WARN][0m MEMORY LEAK [MEDIUM]: Memory allocated but never freed in _ZN7cpp_fft11InitTwiddleEmPPdS1_
+
+info: [32m[INFO][0m PointerOwnership: Found 1 memory leaks (formalized as issues)
+
+info: [32m[INFO][0m PointerOwnership: Found 1 allocations, 0 frees, 0 tracked pointers
+
+info: [32m[INFO][0m PointerOwnership: 1 cross-FFI ownership transfers detected
+
+info: [32m[INFO][0m PointerOwnership: No cross-language ownership violations detected
+
+info: [32m[INFO][0m   (Checks for Rust-alloc/C-free or C-alloc/Rust-free mismatches)
+
+info: [32m[INFO][0m PointerOwnership: Memory pool stats - allocated: 1, reused: 0, in_use: 1
+
+info: ═══════════════════════════════════════════════════════════════
+info: Zone Classification Summary
+info: ═══════════════════════════════════════════════════════════════
+info:   Total functions analyzed:    36
+info:   Safe zone (skipped):         0 (50.0%)
+info:   Runtime internal (skipped):  18
+info:   Unsafe zone (analyzed):      0
+info:   FFI zone (analyzed):         6
+info:   Unknown zone:                12
+info: 
+info:   Escape zone functions:       6 (16.7% of total)
+info:   Issues found:              1
+info:     Issue breakdown by category:
+info:       Memory leak:              1
+info: 
+info:     90/10 Priority Classification:
+info:       FFI Boundary (90% core):     0
+info:       Local Only (10% auxiliary):  1
+info:     Origin breakdown:
+info:       ✅ User code:                  0 (ACTION NEEDED)
+info:       📦 Third-party (FFI):          0
+info:       📚 Stdlib (suppressed):       0
+info:       🔧 Compiler (ignored):        1
+info: 
+info:     Graph coverage:
+info:       Total nodes analyzed:     0
+info:       Nodes on danger path:     0 (0.0%)
+info:       FFI boundaries tracked:   0
+info:       Issues in graph:          1
+info:       Analysis depth:           shallow scan
+info: ═══════════════════════════════════════════════════════════════
+info: 
+=== Performance Profile Report ===
+
+
+info: Operation                           Calls   Total (ms)     Avg (us)     Max (us)
+
+info: --------------------------------------------------------------------------------
+
+info: init                                    1         3.84      3843.71      3843.71
+
+info: detect                                  2         0.37       182.88       207.33
+
+info: total                                   1         3.85      3848.38      3848.38
+
+info: analysis                                1         2.62      2623.13      2623.13
+
+info: [32m[INFO][0m PointerOwnership: 4 ops, 10.68ms total
+
+info: [32m[INFO][0m FFIUnsafe: No FFI boundaries to analyze
+
+info: [32m[INFO][0m FFIBodyCheck: No FFI boundaries to analyze
+
+info: [32m[INFO][0m MallocCheck: Analyzed functions, found 0 unchecked allocations
+
+info: [INFO] Analysis complete
+
+
+info: [INFO] Functions processed: 12
+
+
+info: [INFO] Facts generated: 2
+
+
+info: [INFO] Time: 9ms
+
+
+info: [INFO] Issues detected: 1
+
+

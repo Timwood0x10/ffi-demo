@@ -1,0 +1,151 @@
+info: [INFO] === OmniScope IR Analysis ===
+
+
+info: [INFO] File: /Users/scc/code/ffi-demo/output/rust_merkle.bc
+
+
+
+info: [INFO] Loaded: 26 functions
+
+
+
+info: [INFO] LANG-DETECT: module language = rust, confidence = 100.0%, method = personality
+
+info: [32m[INFO][0m ReturnCheck: Analyzed functions, found 0 unchecked return values
+
+info: [32m[INFO][0m RustFfiFilter: analyzed 6 funcs, 0 findings (0 stack escapes)
+
+info: [32m[INFO][0m CallGraph: extracted 68 cross-language edges
+
+info: [32m[INFO][0m CallGraph: built semantics CallGraph with 26 nodes, 75 edges for BFS traversal
+
+info: [32m[INFO][0m IntegerOverflow: Analyzed functions, found 0 potential overflows
+
+info: [33m[WARN][0m PtrLifetime: skipped function due to error: error.NodeNotFound (_ZN11rust_merkle10MerkleTree3new17h45b67272fd153021E)
+
+info: [33m[WARN][0m PtrLifetime: skipped function due to error: error.NodeNotFound (_ZN11rust_merkle13format_digest17h6d184b111e83b67fE)
+
+info: [32m[INFO][0m FFITypeMismatch: analyzed 51 calls, found 48 FFI boundaries, 0 issues
+
+info: [32m[INFO][0m [P1-1] DangerSurfacePass: 68 FFI, 11 allocs, 2 funcs | Phase1=0ms (args=226 rets=0 alias_traces=226) Phase2=1ms (cross_lang_free=0)
+
+info: [32m[INFO][0m PointerFlow: 35 values tracked after propagation
+
+info: [32m[INFO][0m CallbackEscape: analyzed 2 funcs, 0 cgo boundaries, 0 issues found
+
+info: [32m[INFO][0m FFIBoundary: consuming 68 cross-language edges from CallGraph
+
+info: [31m[ERROR][0m RISKY CALL [medium] deallocator in _ZN11rust_merkle10MerkleTree3new17h45b67272fd153021E: _RNvCsfLfy6EI15iL_7___rustc14___rust_dealloc
+
+info: [31m[ERROR][0m RISKY CALL [medium] deallocator in _ZN11rust_merkle13format_digest17h6d184b111e83b67fE: _RNvCsfLfy6EI15iL_7___rustc14___rust_dealloc
+
+info: [31m[ERROR][0m RISKY CALL [medium] deallocator in _ZN11rust_merkle13format_digest17h6d184b111e83b67fE: _RNvCsfLfy6EI15iL_7___rustc14___rust_dealloc
+
+info: [31m[ERROR][0m RISKY CALL [medium] deallocator in _ZN11rust_merkle13format_digest17h6d184b111e83b67fE: _RNvCsfLfy6EI15iL_7___rustc14___rust_dealloc
+
+info: [32m[INFO][0m FFIBoundary: 2/6 funcs analyzed, 4 skipped (irrelevant), 24 issues generated
+
+info: [32m[INFO][0m BufferOverflow: No buffer overflow issues detected
+
+info: [32m[INFO][0m TIP: Rebuild with -g for file/line diagnostics
+
+info: [32m[INFO][0m PointerOwnership: Source 1 (MemoryGraph) — 25 unfreed + 8 freed = 33 total nodes
+
+info: [32m[INFO][0m PointerOwnership: Source 2 (GlobalAllocTracker) — 3 records, 0 freed
+
+info: [32m[INFO][0m PointerOwnership: Source 3 (IR scan) added 11 frees — total now 11
+
+info: [32m[INFO][0m PointerOwnership: Pre-populated from MemoryGraph + GlobalAllocTracker + IR-scan — 25 allocs, 11 frees
+
+info: [33m[WARN][0m MEMORY LEAK [MEDIUM]: Memory allocated but never freed in _ZN11rust_merkle13format_digest17h6d184b111e83b67fE
+
+info: [33m[WARN][0m MEMORY LEAK [MEDIUM]: Memory allocated but never freed in _ZN11rust_merkle10MerkleTree3new17h45b67272fd153021E
+
+info: [32m[INFO][0m PointerOwnership: Found 2 memory leaks (formalized as issues)
+
+info: [32m[INFO][0m PointerOwnership: Found 28 allocations, 15 frees, 3 tracked pointers
+
+info: [32m[INFO][0m PointerOwnership: 14 cross-FFI ownership transfers detected
+
+info: [32m[INFO][0m PointerOwnership: No cross-language ownership violations detected
+
+info: [32m[INFO][0m   (Checks for Rust-alloc/C-free or C-alloc/Rust-free mismatches)
+
+info: [32m[INFO][0m PointerOwnership: Memory pool stats - allocated: 28, reused: 0, in_use: 28
+
+info: ═══════════════════════════════════════════════════════════════
+info: Zone Classification Summary
+info: ═══════════════════════════════════════════════════════════════
+info:   Total functions analyzed:    78
+info:   Safe zone (skipped):         0 (30.8%)
+info:   Runtime internal (skipped):  24
+info:   Unsafe zone (analyzed):      12
+info:   FFI zone (analyzed):         36
+info:   Unknown zone:                6
+info: 
+info:   Escape zone functions:       48 (61.5% of total)
+info:   Issues found:              6
+info:     Issue breakdown by category:
+info:       Memory leak:              2
+info:       FFI unsafe call:          2
+info:       Invalid free:             2
+info: 
+info:     90/10 Priority Classification:
+info:       FFI Boundary (90% core):     2
+info:       Local Only (10% auxiliary):  4
+info:     Origin breakdown:
+info:       ✅ User code:                  0 (ACTION NEEDED)
+info:       📦 Third-party (FFI):          0
+info:       📚 Stdlib (suppressed):       0
+info:       🔧 Compiler (ignored):        6
+info: 
+info:     Graph coverage:
+info:       Total nodes analyzed:     0
+info:       Nodes on danger path:     0 (0.0%)
+info:       FFI boundaries tracked:   0
+info:       Issues in graph:          6
+info:       Analysis depth:           shallow scan
+info: ═══════════════════════════════════════════════════════════════
+info: 
+=== Performance Profile Report ===
+
+
+info: Operation                           Calls   Total (ms)     Avg (us)     Max (us)
+
+info: --------------------------------------------------------------------------------
+
+info: init                                    1        15.08     15081.50     15081.50
+
+info: detect                                  2         4.09      2043.75      2083.83
+
+info: total                                   1        15.09     15086.50     15086.50
+
+info: analysis                                1        10.51     10512.33     10512.33
+
+info: [32m[INFO][0m PointerOwnership: 4 ops, 44.77ms total
+
+info: [32m[INFO][0m [PERF] Pass 'pointer-ownership: 15 ms
+
+info: [32m[INFO][0m FFIUnsafe: No FFI boundaries to analyze
+
+info: [32m[INFO][0m FFIBodyCheck: No FFI boundaries to analyze
+
+info: [32m[INFO][0m MallocCheck: Analyzed functions, found 0 unchecked allocations
+
+info: [32m[INFO][0m GlobalAllocTracker: 3 memory leaks confirmed from 3 tracked allocations (0 cross-FFI)
+
+info: [INFO] Analysis complete
+
+
+info: [INFO] Functions processed: 26
+
+
+info: [INFO] Facts generated: 37
+
+
+info: [INFO] Time: 41ms
+
+
+info: [INFO] Issues detected: 6
+
+

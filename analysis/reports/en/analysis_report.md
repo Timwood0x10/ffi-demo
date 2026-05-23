@@ -1,0 +1,127 @@
+# OmniScope FFI-Demo Analysis Report
+
+**Date:** 2026-05-22  
+**Analyzer:** OmniScope v0.1.7  
+**Target:** ffi-demo (7 LLVM IR bitcode modules)  
+**Purpose:** Cross-language FFI boundary bug detection with tpFP evaluation
+
+---
+
+## 1. Executive Summary
+
+OmniScope analyzed 7 bitcode modules across C, C++, and Rust, detecting **29 issues** total. After cross-referencing with source code annotations, **7 issues are True Positives (TP)** and **22 are False Positives (FP)**, yielding a **tpFP ratio of 1:3.14** (TP rate = 24.1%).
+
+---
+
+## 2. Per-File Analysis
+
+### 2.1 c_fft_c_bridge.bc
+
+| # | Category | Function | Severity | TP/FP | Verdict |
+|---|----------|----------|----------|-------|---------|
+| 1 | Memory leak | c_fft_test_signal | MEDIUM | **TP** | BUG[FFT-LEAK-5]: malloc(256) never freed |
+| 2 | Use-after-free | c_fft_test_signal | MEDIUM | FP | No UAF; false alias tracking |
+| 3 | Use-after-free | c_fft_forward | MEDIUM | FP | No UAF; copies freed after use |
+| 4 | FFI unsafe call | (boundary) | — | FP | FFTForward is legitimate |
+| 5 | FFI unsafe call | (boundary) | — | FP | Same |
+| 6-9 | Invalid free | c_fft_forward/test_signal | CRITICAL | FP | Valid free() calls; pointer tracking confusion |
+
+**Miss:** BUG[FFT-LEAK-4] (fd leak) — OmniScope does not track file descriptors.
+
+### 2.2 c_hash_c_bridge.bc
+
+| # | Category | Function | Severity | TP/FP | Verdict |
+|---|----------|----------|----------|-------|---------|
+| 1 | Memory leak | c_hash | MEDIUM | **TP** | BUG[LEAK-MALLOC]: free() inside if(len>0) |
+| 2 | Use-after-free | c_hash | MEDIUM | FP | No UAF in source |
+| 3 | FFI unsafe call | (boundary) | — | FP | cpp_hash_Hash is legitimate |
+| 4 | Invalid free | c_hash | CRITICAL | FP | free(copy) is valid |
+
+**Miss:** BUG[LEAK-FD] (fopen without fclose).
+
+### 2.3 c_merkle_tree.bc
+
+| # | Category | Function | Severity | TP/FP | Verdict |
+|---|----------|----------|----------|-------|---------|
+| 1 | Memory leak | merkle_root | MEDIUM | FP | nodes freed at line 103 |
+| 2 | Use-after-free | merkle_root | MEDIUM | FP | No UAF |
+| 3 | Double free | merkle_root | — | FP | Error paths free+return, normal path free — exclusive |
+| 4 | FFI unsafe call | (boundary) | — | FP | c_hash is legitimate |
+| 5 | Invalid free | merkle_root | HIGH | FP | Valid free(nodes) |
+
+**Miss:** BUG[19] (level_start not updated) — logic bug beyond scope.
+
+### 2.4 cpp_fft.bc
+
+| # | C| # | C| # | C| # | C| # | C| # | C| # | Crdict |
+|---|----------|----------|----------|-------|---------|
+| 1 | Memory leak | InitTwiddle | MEDIUM | **TP** | BUG[FFT-LEAK-1]: sin_table may leak |
+
+**Miss:** BUG[FFT-LEAK-2] (BitReverseTable) — delete[] rev masks the issue.
+
+### 2.5 cpp_hash.bc
+
+| # | Category | Function | Severity | TP/FP | Verdict |
+|---|----------|----------|----------|-------|---------|
+| 1 | Memory leak | CompressBlock | MEDIUM | **TP** | BUG[LEAK-2]: ext=new uint32_t[48] never freed |
+| 2 | Memory leak | Hash | MEDIUM | **TP** | BUG[LEAK-3]: PadHelper leaked; also BUG[LEAK-1] rotation_cache |
+| 3 | FFI unsafe call | (boundary) | — | FP | Internal C++ call |
+| 4 | Borrow escape | (boundary) | — | FP | No borrow escape |
+
+### 2.6 rust_hash.bc — 0 issues
+
+**Miss:** BUG[7] (null returns 0), BUG[8] (ignores result) — logic bugs.
+
+### 2.7 rust_merkle.bc
+
+| # | Category | Function | Severity | TP/FP | Verdict |
+|---|----------|----------|----------|-------|---------|
+| 1 | Memory leak | format_digest | MEDIUM | FP | String freed by Drop |
+| 2 | Memory leak | MerkleTree::new | MEDIUM | FP | Vec managed by Rust allocator |
+| 3-4 | FFI unsafe call | __rust_dealloc | — | FP | Rust internal deallocator |
+| 5-6 | Invalid free | __rust_dealloc | — | FP | Rust allocator internals | 5-6 | Invalid f10] (start not updated), BUG[13] (uppercase hex) — logic bugs.
+
+---
+
+## 3. Summary Statistics
+
+
+# 3. Summary Statistics
+rust_dealloc | — | FP | Rust allocator internals | 5-6 | Invalid f10] (stalse Positives (FP) | 22 |
+| **tpFP ratio** | **1:3.14** |
+| **TP rate** | **24.1%** |
+| Known bugs in source | 13 |
+| Bugs detected | 5 of 13 |
+| Recall rate | 38.5% |
+
+### TP by Category
+
+| Category | TP |
+|----------|----|
+| Memory leak | 5 |
+| Double free | 0 |
+| Use-after-free | 0 |
+| Invalid free | 0 |
+| FFI unsafe call | 0 |
+| fd leak | 0 |
+
+### FP Root Causes
+
+| Cause | Count |
+|-------|-------|
+| Rust allocator misclassification | 6 |
+| Invalid free from alias confusion | 5 |
+| UAF from ownership tracking | 3 |
+| Legitimate FFI flagged | 5 |
+| Managed memory flagged as leak | 3 |
+
+---
+
+## 4. Recommendations
+
+1. **Rust allocator filtering**: Add `__rust_alloc/__rust_dealloc/__rust_realloc` to compiler-reserved
+2. **FreeValidation refinement**: Cross-reference with MemoryGraph to reduce phantom invalid frees
+3. **UAF tracking improvement**: Add ownership transfer semantics
+4. **FFI precision**: Only flag cross-allocation-domain calls (malloc+delete, new+free)
+
+*Generated by OmniScope with manual source-code verification.*

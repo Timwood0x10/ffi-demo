@@ -1,0 +1,1 @@
+{"schema_version":"1.0.0","tool":"omniscope","tool_version":"0.1.9","timestamp":1779457010,"summary":{"functions":12,"issues":1,"time_ms":9},"issues":[{"id":"OMI-001","kind":"memory_leak","severity":"medium","confidence":"MEDIUM","confidence_score":0.70,"cwe_id":401,"message":"Memory allocated but never freed","location":{"function":"_ZN7cpp_fft11InitTwiddleEmPPdS1_"}}]}

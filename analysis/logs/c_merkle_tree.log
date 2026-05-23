@@ -1,0 +1,148 @@
+info: [INFO] === OmniScope IR Analysis ===
+
+
+info: [INFO] File: /Users/scc/code/ffi-demo/output/c_merkle_tree.bc
+
+
+
+info: [INFO] Loaded: 9 functions
+
+
+
+info: [INFO] LANG-DETECT: module language = c, confidence = 100.0%, method = sampling
+
+info: [32m[INFO][0m ReturnCheck: Analyzed functions, found 0 unchecked return values
+
+info: [32m[INFO][0m RustFfiFilter: analyzed 1 funcs, 0 findings (0 stack escapes)
+
+info: [32m[INFO][0m CallGraph: extracted 8 cross-language edges
+
+info: [32m[INFO][0m CallGraph: built semantics CallGraph with 9 nodes, 12 edges for BFS traversal
+
+info: [32m[INFO][0m IntegerOverflow: Analyzed functions, found 0 potential overflows
+
+info: [32m[INFO][0m FFITypeMismatch: analyzed 12 calls, found 12 FFI boundaries, 0 issues
+
+info: [32m[INFO][0m [P1-1] DangerSurfacePass: 8 FFI, 6 allocs, 1 funcs | Phase1=0ms (args=23 rets=0 alias_traces=23) Phase2=0ms (cross_lang_free=0)
+
+info: [32m[INFO][0m PointerFlow: 3 values tracked after propagation
+
+info: [33m[WARN][0m [OMI-HIGH] Invalid free on non-heap source pointer in function: merkle_root
+
+info: [33m[WARN][0m [OMI-HIGH] Invalid free on non-heap source pointer in function: merkle_root
+
+info: [33m[WARN][0m [OMI-HIGH] Invalid free on non-heap source pointer in function: merkle_root
+
+info: [32m[INFO][0m [OMI-HIGH] FreeValidation: Found 3 invalid free calls
+
+info: [33m[WARN][0m [FREE-ORPHAN] 3 frees vs 1 allocs in merkle_root
+
+info: [32m[INFO][0m CallbackEscape: analyzed 1 funcs, 0 cgo boundaries, 2 issues found
+
+info: [32m[INFO][0m FFIBoundary: consuming 8 cross-language edges from CallGraph
+
+info: [32m[INFO][0m FFIBoundary: 1/1 funcs analyzed, 0 skipped (irrelevant), 4 issues generated
+
+info: [32m[INFO][0m BufferOverflow: No buffer overflow issues detected
+
+info: [32m[INFO][0m TIP: Rebuild with -g for file/line diagnostics
+
+info: [32m[INFO][0m PointerOwnership: Source 1 (MemoryGraph) — 2 unfreed + 7 freed = 9 total nodes
+
+info: [32m[INFO][0m PointerOwnership: Source 2 (GlobalAllocTracker) — 1 records, 1 freed
+
+info: [32m[INFO][0m PointerOwnership: Source 3 (IR scan) added 8 frees — total now 8
+
+info: [32m[INFO][0m PointerOwnership: Pre-populated from MemoryGraph + GlobalAllocTracker + IR-scan — 2 allocs, 8 frees
+
+info: [33m[WARN][0m MEMORY LEAK [MEDIUM]: Memory allocated but never freed in merkle_root
+
+info: [33m[WARN][0m USE-AFTER-FREE [MEDIUM]: Pointer 0 used after free in merkle_root
+
+info: [32m[INFO][0m PointerOwnership: Found 1 memory leaks (formalized as issues)
+
+info: [32m[INFO][0m PointerOwnership: Found 1 use-after-free issues (formalized as issues)
+
+info: [32m[INFO][0m PointerOwnership: Found 3 allocations, 11 frees, 1 tracked pointers
+
+info: [32m[INFO][0m PointerOwnership: No cross-language ownership violations detected
+
+info: [32m[INFO][0m   (Checks for Rust-alloc/C-free or C-alloc/Rust-free mismatches)
+
+info: [32m[INFO][0m PointerOwnership: Memory pool stats - allocated: 3, reused: 0, in_use: 3
+
+info: ═══════════════════════════════════════════════════════════════
+info: Zone Classification Summary
+info: ═══════════════════════════════════════════════════════════════
+info:   Total functions analyzed:    27
+info:   Safe zone (skipped):         0 (55.6%)
+info:   Runtime internal (skipped):  15
+info:   Unsafe zone (analyzed):      0
+info:   FFI zone (analyzed):         9
+info:   Unknown zone:                3
+info: 
+info:   Escape zone functions:       9 (33.3% of total)
+info:   Issues found:              5
+info:     Issue breakdown by category:
+info:       Memory leak:              1
+info:       Use after free:           1
+info:       Double free:               1
+info:       FFI unsafe call:          1
+info:       Invalid free:             1
+info: 
+info:     90/10 Priority Classification:
+info:       FFI Boundary (90% core):     1
+info:       Local Only (10% auxiliary):  4
+info:     Origin breakdown:
+info:       ✅ User code:                  5 (ACTION NEEDED)
+info:       📦 Third-party (FFI):          0
+info:       📚 Stdlib (suppressed):       0
+info:       🔧 Compiler (ignored):        0
+info:     → 5 actionable issues (5 user, 0 FFI boundary)
+info: 
+info:     Graph coverage:
+info:       Total nodes analyzed:     0
+info:       Nodes on danger path:     0 (0.0%)
+info:       FFI boundaries tracked:   0
+info:       Issues in graph:          5
+info:       Analysis depth:           shallow scan
+info: ═══════════════════════════════════════════════════════════════
+info: 
+=== Performance Profile Report ===
+
+
+info: Operation                           Calls   Total (ms)     Avg (us)     Max (us)
+
+info: --------------------------------------------------------------------------------
+
+info: init                                    1         2.25      2250.38      2250.38
+
+info: detect                                  2         0.49       243.21       272.92
+
+info: total                                   1         2.26      2255.21      2255.21
+
+info: analysis                                1         1.46      1455.17      1455.17
+
+info: [32m[INFO][0m PointerOwnership: 4 ops, 6.45ms total
+
+info: [32m[INFO][0m FFIUnsafe: No FFI boundaries to analyze
+
+info: [32m[INFO][0m FFIBodyCheck: No FFI boundaries to analyze
+
+info: [32m[INFO][0m MallocCheck: Analyzed functions, found 0 unchecked allocations
+
+info: [INFO] Analysis complete
+
+
+info: [INFO] Functions processed: 9
+
+
+info: [INFO] Facts generated: 7
+
+
+info: [INFO] Time: 7ms
+
+
+info: [INFO] Issues detected: 5
+
+

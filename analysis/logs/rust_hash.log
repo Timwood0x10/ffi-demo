@@ -1,0 +1,104 @@
+info: [INFO] === OmniScope IR Analysis ===
+
+
+info: [INFO] File: /Users/scc/code/ffi-demo/output/rust_hash.bc
+
+
+
+info: [INFO] Loaded: 4 functions
+
+
+
+info: [INFO] LANG-DETECT: module language = c, confidence = 100.0%, method = sampling
+
+info: [32m[INFO][0m ReturnCheck: Analyzed functions, found 0 unchecked return values
+
+info: [32m[INFO][0m RustFfiFilter: analyzed 2 funcs, 0 findings (0 stack escapes)
+
+info: [32m[INFO][0m CallGraph: extracted 2 cross-language edges
+
+info: [32m[INFO][0m CallGraph: built semantics CallGraph with 4 nodes, 2 edges for BFS traversal
+
+info: [32m[INFO][0m IntegerOverflow: Analyzed functions, found 0 potential overflows
+
+info: [32m[INFO][0m FFITypeMismatch: analyzed 2 calls, found 2 FFI boundaries, 0 issues
+
+info: [33m[WARN][0m [P1-1] DangerSurfacePass: MemoryGraph is empty despite ptr-lifetime dep — ptr-lifetime may have skipped this module
+
+info: [32m[INFO][0m [P1-1] DangerSurfacePass: 2 FFI, 0 allocs, 0 funcs | Phase1=0ms (args=0 rets=0 alias_traces=0) Phase2=0ms (cross_lang_free=0)
+
+info: [32m[INFO][0m CallbackEscape: analyzed 0 funcs, 0 cgo boundaries, 0 issues found
+
+info: [32m[INFO][0m FFIBoundary: consuming 2 cross-language edges from CallGraph
+
+info: [32m[INFO][0m FFIBoundary: 0/2 funcs analyzed, 2 skipped (irrelevant), 0 issues generated
+
+info: [32m[INFO][0m BufferOverflow: No buffer overflow issues detected
+
+info: [32m[INFO][0m TIP: Rebuild with -g for file/line diagnostics
+
+info: [32m[INFO][0m PointerOwnership: Source 1 (MemoryGraph) — 0 unfreed + 0 freed = 0 total nodes
+
+info: [32m[INFO][0m PointerOwnership: Source 2 (GlobalAllocTracker) — 0 records, 0 freed
+
+info: [32m[INFO][0m PointerOwnership: Source 3 (IR scan) added 0 frees — total now 0
+
+info: [32m[INFO][0m PointerOwnership: Pre-populated from MemoryGraph + GlobalAllocTracker + IR-scan — 0 allocs, 0 frees
+
+info: [32m[INFO][0m PointerOwnership: Found 0 allocations, 0 frees, 0 tracked pointers
+
+info: [32m[INFO][0m PointerOwnership: No cross-language ownership violations detected
+
+info: [32m[INFO][0m   (Checks for Rust-alloc/C-free or C-alloc/Rust-free mismatches)
+
+info: [32m[INFO][0m PointerOwnership: Memory pool stats - allocated: 0, reused: 0, in_use: 0
+
+info: ═══════════════════════════════════════════════════════════════
+info: Zone Classification Summary
+info: ═══════════════════════════════════════════════════════════════
+info:   Total functions analyzed:    12
+info:   Safe zone (skipped):         0 (0.0%)
+info:   Runtime internal (skipped):  0
+info:   Unsafe zone (analyzed):      0
+info:   FFI zone (analyzed):         6
+info:   Unknown zone:                6
+info: 
+info:   Escape zone functions:       6 (50.0% of total)
+info:   Issues found:                0
+info: ═══════════════════════════════════════════════════════════════
+info: 
+=== Performance Profile Report ===
+
+
+info: Operation                           Calls   Total (ms)     Avg (us)     Max (us)
+
+info: --------------------------------------------------------------------------------
+
+info: init                                    1         0.63       632.38       632.38
+
+info: detect                                  2         0.04        22.15        40.21
+
+info: total                                   1         0.64       639.63       639.63
+
+info: analysis                                1         0.35       345.17       345.17
+
+info: [32m[INFO][0m PointerOwnership: 4 ops, 1.66ms total
+
+info: [32m[INFO][0m FFIUnsafe: No FFI boundaries to analyze
+
+info: [32m[INFO][0m FFIBodyCheck: No FFI boundaries to analyze
+
+info: [32m[INFO][0m MallocCheck: Analyzed functions, found 0 unchecked allocations
+
+info: [INFO] Analysis complete
+
+
+info: [INFO] Functions processed: 4
+
+
+info: [INFO] Facts generated: 0
+
+
+info: [INFO] Time: 2ms
+
+

@@ -1,0 +1,79 @@
+# Build directories
+build/
+output/
+
+# LLVM output
+llvm-output/
+
+# C/C++
+*.o
+*.a
+*.so
+*.dylib
+*.bc
+*.ll
+
+# Rust
+**/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.sum
+
+# Python
+*.py[cod]
+__pycache__/
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Swift
+*.swiftdoc
+*.swiftsourceinfo
+*.swiftmodule
+.build/
+Packages/
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+*.xcworkspace/*
+!*.xcworkspace/contents.xcworkspacedata
+!*.xcworkspace/xcshareddata/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# CodeArts
+.codeartsdoer/
+
+# Joycode
+.joycode/
+
+# Analysis directory (if it contains generated files)
+analysis/*.bc
+analysis/*.ll
