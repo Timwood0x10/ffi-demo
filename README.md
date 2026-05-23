@@ -11,40 +11,56 @@
 
 This project demonstrates Foreign Function Interface (FFI) interoperability across **five languages**: C++, C, Rust, Go, and Python. It implements two core algorithms in C++ — **SHA-256 hashing** and **Fast Fourier Transform (Cooley-Tukey radix-2)** — and exposes them to upper-level languages through a carefully orchestrated FFI chain.
 
-**Primary purpose**: This is a code review training and testing tool. Each source file contains **intentional bugs** (annotated with `// BUG[n]:` comments) that test a reviewer's ability to identify subtle issues — primarily memory leaks and resource management errors.
+**Primary purpose**: This is a code review training and testing tool designed for the **[OmniScope](https://github.com/Timwood0x10/OmniScope)** project. Each source file contains **intentional bugs** (annotated with `// BUG[n]:` comments) that test a reviewer's ability to identify subtle issues — primarily memory leaks and resource management errors.
 
 ### Architecture
 
-```
-                    ┌──────────────────────────────────┐
-                    │      C++ Core Algorithms          │
-                    │  ┌─────────────────────────┐      │
-                    │  │  hash.cpp — SHA-256      │      │
-                    │  │  fft.cpp  — FFT (radix-2)│      │
-                    │  └──────────┬──────────────┘      │
-                    └─────────────┼────────────────────┘
-                                  │
-                    ┌─────────────▼────────────────────┐
-                    │        C Bridge (extern "C")       │
-                    │  hash_c_bridge.c   fft_c_bridge.c  │
-                    │  go_hash_bridge.c                  │
-                    └──────┬──────┬──────┬──────┬───────┘
-                           │      │      │      │
-              ┌────────────┘      │      │      └────────────┐
-              ▼                   ▼      ▼                   ▼
-    ┌─────────────────┐  ┌──────────────┐  ┌───────────────────┐
-    │  Rust FFI        │  │  C Program   │  │  Python (ctypes)  │
-    │  rust_hash       │  │  merkle_tree │  │  Python → C       │
-    │  rust_merkle     │  │  C → C++     │  │  → C++            │
-    │  Rust → C → C++  │  └──────────────┘  └───────────────────┘
-    └────────┬─────────┘
-             │  Complex Chain: Go → C → Rust → C → C++
-             ▼
-    ┌─────────────────┐
-    │  Go (cgo)        │
-    │  main.go         │
-    │  Go→C→Rust→C→C++ │
-    └──────────────────┘
+```mermaid
+graph TB
+    subgraph CPP["C++ Core Algorithms"]
+        HASH["hash.cpp<br/>SHA-256"]
+        FFT["fft.cpp<br/>FFT (radix-2)"]
+    end
+
+    subgraph C_BRIDGE["C Bridge (extern 'C')"]
+        HASH_BRIDGE["hash_c_bridge.c"]
+        FFT_BRIDGE["fft_c_bridge.c"]
+        GO_BRIDGE["go_hash_bridge.c"]
+    end
+
+    subgraph RUST["Rust FFI"]
+        RUST_HASH["rust_hash<br/>Rust → C → C++"]
+        RUST_MERKLE["rust_merkle<br/>Rust → C → C++"]
+    end
+
+    subgraph OTHER["Other Languages"]
+        C_PROG["C Program<br/>merkle_tree<br/>C → C++"]
+        PYTHON["Python (ctypes)<br/>Python → C → C++"]
+        GO["Go (cgo)<br/>main.go<br/>Go → C → Rust → C → C++"]
+    end
+
+    HASH --> HASH_BRIDGE
+    FFT --> FFT_BRIDGE
+    HASH --> GO_BRIDGE
+
+    HASH_BRIDGE --> RUST_HASH
+    HASH_BRIDGE --> RUST_MERKLE
+    FFT_BRIDGE --> RUST_MERKLE
+
+    HASH_BRIDGE --> C_PROG
+    FFT_BRIDGE --> C_PROG
+
+    HASH_BRIDGE --> PYTHON
+    FFT_BRIDGE --> PYTHON
+
+    GO_BRIDGE --> RUST_HASH
+    RUST_HASH --> GO
+    FFT_BRIDGE --> GO
+
+    style CPP fill:#e1f5ff
+    style C_BRIDGE fill:#fff4e1
+    style RUST fill:#ffe1f5
+    style OTHER fill:#e1ffe1
 ```
 
 ### FFI Chains

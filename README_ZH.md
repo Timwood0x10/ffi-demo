@@ -9,40 +9,56 @@
 
 本项目演示了**五种语言**（C++、C、Rust、Go、Python）之间的外部函数接口（FFI）互操作性。在 C++ 中实现了两项核心算法——**SHA-256 哈希**和**快速傅里叶变换（Cooley-Tukey 基-2）**——并通过精心设计的 FFI 链暴露给上层语言。
 
-**主要用途**：这是一个代码审查训练和测试工具。每个源文件都包含**故意设置的缺陷**（以 `// BUG[n]:` 注释标注），用于测试审查者发现微妙问题的能力——主要是内存泄漏和资源管理错误。
+**主要用途**：这是一个为 **[OmniScope](https://github.com/Timwood0x10/OmniScope)** 项目设计的代码审查训练和测试工具。每个源文件都包含**故意设置的缺陷**（以 `// BUG[n]:` 注释标注），用于测试审查者发现微妙问题的能力——主要是内存泄漏和资源管理错误。
 
 ### 架构
 
-```
-                    ┌──────────────────────────────────┐
-                    │        C++ 核心算法               │
-                    │  ┌─────────────────────────┐      │
-                    │  │  hash.cpp — SHA-256       │      │
-                    │  │  fft.cpp  — FFT (基-2)   │      │
-                    │  └──────────┬──────────────┘      │
-                    └─────────────┼────────────────────┘
-                                  │
-                    ┌─────────────▼────────────────────┐
-                    │        C 桥接层 (extern "C")       │
-                    │  hash_c_bridge.c   fft_c_bridge.c  │
-                    │  go_hash_bridge.c                  │
-                    └──────┬──────┬──────┬──────┬───────┘
-                           │      │      │      │
-              ┌────────────┘      │      │      └────────────┐
-              ▼                   ▼      ▼                   ▼
-    ┌─────────────────┐  ┌──────────────┐  ┌───────────────────┐
-    │  Rust FFI        │  │  C 程序      │  │  Python (ctypes)  │
-    │  rust_hash       │  │  merkle_tree │  │  Python → C       │
-    │  rust_merkle     │  │  C → C++     │  │  → C++            │
-    │  Rust → C → C++  │  └──────────────┘  └───────────────────┘
-    └────────┬─────────┘
-             │  复杂链: Go → C → Rust → C → C++
-             ▼
-    ┌─────────────────┐
-    │  Go (cgo)        │
-    │  main.go         │
-    │  Go→C→Rust→C→C++ │
-    └──────────────────┘
+```mermaid
+graph TB
+    subgraph CPP["C++ 核心算法"]
+        HASH["hash.cpp<br/>SHA-256"]
+        FFT["fft.cpp<br/>FFT (基-2)"]
+    end
+
+    subgraph C_BRIDGE["C 桥接层 (extern 'C')"]
+        HASH_BRIDGE["hash_c_bridge.c"]
+        FFT_BRIDGE["fft_c_bridge.c"]
+        GO_BRIDGE["go_hash_bridge.c"]
+    end
+
+    subgraph RUST["Rust FFI"]
+        RUST_HASH["rust_hash<br/>Rust → C → C++"]
+        RUST_MERKLE["rust_merkle<br/>Rust → C → C++"]
+    end
+
+    subgraph OTHER["其他语言"]
+        C_PROG["C 程序<br/>merkle_tree<br/>C → C++"]
+        PYTHON["Python (ctypes)<br/>Python → C → C++"]
+        GO["Go (cgo)<br/>main.go<br/>Go → C → Rust → C → C++"]
+    end
+
+    HASH --> HASH_BRIDGE
+    FFT --> FFT_BRIDGE
+    HASH --> GO_BRIDGE
+
+    HASH_BRIDGE --> RUST_HASH
+    HASH_BRIDGE --> RUST_MERKLE
+    FFT_BRIDGE --> RUST_MERKLE
+
+    HASH_BRIDGE --> C_PROG
+    FFT_BRIDGE --> C_PROG
+
+    HASH_BRIDGE --> PYTHON
+    FFT_BRIDGE --> PYTHON
+
+    GO_BRIDGE --> RUST_HASH
+    RUST_HASH --> GO
+    FFT_BRIDGE --> GO
+
+    style CPP fill:#e1f5ff
+    style C_BRIDGE fill:#fff4e1
+    style RUST fill:#ffe1f5
+    style OTHER fill:#e1ffe1
 ```
 
 ### FFI 链
