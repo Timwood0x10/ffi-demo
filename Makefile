@@ -11,6 +11,7 @@
 #   - Go Merkle tree + FFT (complex chain: Go -> C -> Rust -> C -> C++)
 #   - Swift Merkle tree + FFT (calls C bridge → C++)
 #   - Python Merkle tree + FFT (calls C bridge via ctypes)
+#   - Zig FFI bug demo (Zig → C via @cImport, intentional memory bugs)
 #   - LLVM bitcode (.bc) and LLVM IR (.ll) for each language component
 #
 # Requirements:
@@ -19,6 +20,7 @@
 #   - Rust/Cargo 1.95+
 #   - Swift 6+
 #   - Python 3.14+
+#   - Zig 0.15+
 #   - make
 #
 # Note: LLVM 22 is not available on this system; using LLVM 21 instead.
@@ -40,6 +42,7 @@ CARGO         := cargo
 RUSTC         := rustc
 PYTHON        := python3
 SWIFTC        := swiftc
+ZIG           := zig
 MKDIR_P       := mkdir -p
 
 # ─── Directories ─────────────────────────────────────────────────────────────
@@ -51,6 +54,7 @@ RUST_MERKLE_DIR := rust_merkle
 GO_DIR        := go
 SWIFT_DIR     := swift
 PYTHON_DIR    := python
+ZIG_DIR       := zig
 
 # ─── LLVM Flags ──────────────────────────────────────────────────────────────
 LLVM_CFLAGS   := -O2 -emit-llvm
@@ -63,11 +67,11 @@ LLVM_OUTPUT   := llvm-output
 
 # ─── Targets ─────────────────────────────────────────────────────────────────
 .PHONY: all build-dirs clean
-.PHONY: cpp c rust-hash rust-merkle go swift python
+.PHONY: cpp c rust-hash rust-merkle go swift python zig
 .PHONY: llvm-bitcode llvm-ir
 .PHONY: check test
 
-all: build-dirs cpp c rust-hash rust-merkle go swift python llvm-bitcode $(LLVM_OUTPUT)
+all: build-dirs cpp c rust-hash rust-merkle go swift python zig llvm-bitcode $(LLVM_OUTPUT)
 	@echo ""
 	@echo "=== Build complete ==="
 	@echo "Run 'make check' to verify all outputs."
@@ -82,6 +86,7 @@ build-dirs:
 	$(MKDIR_P) $(BUILD_DIR)/go
 	$(MKDIR_P) $(BUILD_DIR)/swift
 	$(MKDIR_P) $(BUILD_DIR)/python
+	$(MKDIR_P) $(BUILD_DIR)/zig
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # C++ Core Algorithms (SHA-256 Hash + FFT)
@@ -432,6 +437,58 @@ $(PYTHON_BC_NOTE):
 	@echo '  python3 python/merkle_tree.py --lib build/python/libhash.dylib' >> $@
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Zig FFI Bug Demo (Zig → C via @cImport, intentional memory bugs)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Files: zig/main.zig, zig/zig_ffi_bridge.h, zig/zig_ffi_bridge.c
+# Bugs: cross-language free, use-after-free, double-free, buffer overflow,
+#        type confusion, memory leak
+#
+# Zig natively emits LLVM bitcode via -femit-llvm-bc and LLVM IR via
+# -femit-llvm-ir. The Zig compiler targets LLVM IR directly, so these
+# outputs are first-class (not derived from C/clang).
+# ───────────────────────────────────────────────────────────────────────────────
+
+ZIG_BRIDGE_OBJ := $(BUILD_DIR)/zig/zig_ffi_bridge.o
+ZIG_BRIDGE_BC  := $(BUILD_DIR)/zig/zig_ffi_bridge.bc
+ZIG_BRIDGE_LL  := $(BUILD_DIR)/zig/zig_ffi_bridge.ll
+ZIG_MAIN_BC    := $(BUILD_DIR)/zig/main.bc
+ZIG_MAIN_LL    := $(BUILD_DIR)/zig/main.ll
+ZIG_BIN        := $(BUILD_DIR)/zig/zig_ffi_demo
+
+zig: $(ZIG_BRIDGE_OBJ) $(ZIG_BRIDGE_BC) $(ZIG_BRIDGE_LL) $(ZIG_MAIN_BC) $(ZIG_MAIN_LL) $(ZIG_BIN)
+
+# C bridge for Zig (compiled with clang to get .bc/.ll)
+$(ZIG_BRIDGE_OBJ): $(ZIG_DIR)/zig_ffi_bridge.c $(ZIG_DIR)/zig_ffi_bridge.h | build-dirs
+	$(CC) $(C_STD) -c -o $@ $(ZIG_DIR)/zig_ffi_bridge.c
+
+$(ZIG_BRIDGE_BC): $(ZIG_DIR)/zig_ffi_bridge.c $(ZIG_DIR)/zig_ffi_bridge.h | build-dirs
+	$(CC) $(C_STD) $(LLVM_CFLAGS) -c -o $@ $(ZIG_DIR)/zig_ffi_bridge.c
+
+$(ZIG_BRIDGE_LL): $(ZIG_DIR)/zig_ffi_bridge.c $(ZIG_DIR)/zig_ffi_bridge.h | build-dirs
+	$(CC) $(C_STD) $(LLVM_CFLAGS) -S -c -o $@ $(ZIG_DIR)/zig_ffi_bridge.c
+
+# Zig module — emit LLVM bitcode and IR natively
+$(ZIG_MAIN_BC): $(ZIG_DIR)/main.zig $(ZIG_DIR)/zig_ffi_bridge.h | build-dirs
+	cd $(ZIG_DIR) && $(ZIG) build-obj main.zig \
+		-femit-llvm-bc=$(abspath $@) \
+		-fno-lto \
+		-I .
+
+$(ZIG_MAIN_LL): $(ZIG_DIR)/main.zig $(ZIG_DIR)/zig_ffi_bridge.h | build-dirs
+	cd $(ZIG_DIR) && $(ZIG) build-obj main.zig \
+		-femit-llvm-ir=$(abspath $@) \
+		-fno-lto \
+		-I .
+
+# Zig binary (links with C bridge)
+$(ZIG_BIN): $(ZIG_DIR)/main.zig $(ZIG_DIR)/zig_ffi_bridge.h $(ZIG_BRIDGE_OBJ) | build-dirs
+	cd $(ZIG_DIR) && $(ZIG) build-exe main.zig \
+		$(abspath $(ZIG_BRIDGE_OBJ)) \
+		-I . \
+		-lc \
+		-femit-bin=$(abspath $@)
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # LLVM Bitcode — Per-Language Targets
 # ═══════════════════════════════════════════════════════════════════════════════
 # ───────────────────────────────────────────────────────────────────────────────
@@ -443,11 +500,13 @@ LLVM_BC_FILES := \
 	$(BUILD_DIR)/c/fft_c_bridge.bc \
 	$(BUILD_DIR)/c/merkle_tree.bc \
 	$(BUILD_DIR)/rust_hash/rust_hash.bc \
-	$(BUILD_DIR)/rust_merkle/rust_merkle.bc
+	$(BUILD_DIR)/rust_merkle/rust_merkle.bc \
+	$(BUILD_DIR)/zig/zig_ffi_bridge.bc \
+	$(BUILD_DIR)/zig/main.bc
 
 LLVM_IR_FILES := $(LLVM_BC_FILES:.bc=.ll)
 
-llvm-bitcode: cpp c rust-hash rust-merkle
+llvm-bitcode: cpp c rust-hash rust-merkle zig
 	@echo ""
 	@echo "=== LLVM Bitcode (.bc) files in build/ ==="
 	@for f in $(LLVM_BC_FILES); do \
@@ -483,7 +542,9 @@ OUTPUT_BC_FILES := \
 	$(OUTPUT_DIR)/c_fft_c_bridge.bc \
 	$(OUTPUT_DIR)/c_merkle_tree.bc \
 	$(OUTPUT_DIR)/rust_hash.bc \
-	$(OUTPUT_DIR)/rust_merkle.bc
+	$(OUTPUT_DIR)/rust_merkle.bc \
+	$(OUTPUT_DIR)/zig_ffi_bridge.bc \
+	$(OUTPUT_DIR)/zig_main.bc
 
 OUTPUT_IR_FILES := $(OUTPUT_BC_FILES:.bc=.ll)
 
@@ -540,12 +601,24 @@ $(OUTPUT_DIR)/rust_merkle.bc: $(RUST_MERKLE_BC) | $(OUTPUT_DIR)/
 $(OUTPUT_DIR)/rust_merkle.ll: $(RUST_MERKLE_LL) | $(OUTPUT_DIR)/
 	cp $< $@
 
+$(OUTPUT_DIR)/zig_ffi_bridge.bc: $(ZIG_BRIDGE_BC) | $(OUTPUT_DIR)/
+	cp $< $@
+
+$(OUTPUT_DIR)/zig_ffi_bridge.ll: $(ZIG_BRIDGE_LL) | $(OUTPUT_DIR)/
+	cp $< $@
+
+$(OUTPUT_DIR)/zig_main.bc: $(ZIG_MAIN_BC) | $(OUTPUT_DIR)/
+	cp $< $@
+
+$(OUTPUT_DIR)/zig_main.ll: $(ZIG_MAIN_LL) | $(OUTPUT_DIR)/
+	cp $< $@
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Verification & Testing
 # ═══════════════════════════════════════════════════════════════════════════════
 # ───────────────────────────────────────────────────────────────────────────────
 
-check: $(C_MERKLE_BIN) $(RUST_MERKLE_BIN) $(GO_BIN) $(SWIFT_BIN) $(PYTHON_LIB) $(LLVM_OUTPUT)
+check: $(C_MERKLE_BIN) $(RUST_MERKLE_BIN) $(GO_BIN) $(SWIFT_BIN) $(PYTHON_LIB) $(ZIG_BIN) $(LLVM_OUTPUT)
 	@echo ""
 	@echo "═══ Testing C Merkle Tree + FFT ═══"
 	$(C_MERKLE_BIN) || echo "C binary returned $?"
@@ -561,6 +634,9 @@ check: $(C_MERKLE_BIN) $(RUST_MERKLE_BIN) $(GO_BIN) $(SWIFT_BIN) $(PYTHON_LIB) $
 	@echo ""
 	@echo "═══ Testing Python Merkle Tree + FFT ═══"
 	cd $(PYTHON_DIR) && $(PYTHON) merkle_tree.py --lib ../$(PYTHON_LIB) || echo "Python returned $$?"
+	@echo ""
+	@echo "═══ Testing Zig FFI Bug Demo ═══"
+	$(ZIG_BIN) || echo "Zig binary returned $?"
 	@echo ""
 	@echo "═══ LLVM Bitcode in $(OUTPUT_DIR)/ ═══"
 	@for f in $(OUTPUT_BC_FILES); do \
@@ -588,6 +664,7 @@ clean:
 	rm -rf $(OUTPUT_DIR)
 	cd $(RUST_HASH_DIR) && $(CARGO) clean 2>/dev/null || true
 	cd $(RUST_MERKLE_DIR) && $(CARGO) clean 2>/dev/null || true
+	rm -rf $(ZIG_DIR)/.zig-cache $(ZIG_DIR)/zig-out 2>/dev/null || true
 
 distclean: clean
 	@echo "Clean complete."

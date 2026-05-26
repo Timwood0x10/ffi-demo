@@ -1,0 +1,20 @@
+[1m[34m═══════════════════════════════════════════════════════════════
+  OmniScope — Cross-Language Memory Safety Analysis
+═══════════════════════════════════════════════════════════════
+[0m
+[1mCoverage
+[0m───────────────────────────────────────────────────────────────
+  Functions:          9
+  Issues detected:    0
+  Actionable:         0
+
+[1mFindings
+[0m───────────────────────────────────────────────────────────────
+[32m[1m  ✓ No issues detected.
+[0m
+[1mSummary
+[0m───────────────────────────────────────────────────────────────
+[32m[1m  ✓ No issues detected. Analysis clean.
+[0m[2m  Analysis time: 7 ms
+[0m  (use --verbose for pipeline metrics, --debug for full trace)
+═══════════════════════════════════════════════════════════════

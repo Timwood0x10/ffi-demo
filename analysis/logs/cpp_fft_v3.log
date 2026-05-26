@@ -1,0 +1,37 @@
+[1m[34m═══════════════════════════════════════════════════════════════
+  OmniScope — Cross-Language Memory Safety Analysis
+═══════════════════════════════════════════════════════════════
+[0m
+[1mCoverage
+[0m───────────────────────────────────────────────────────────────
+  Functions:          12
+[91m  Issues detected:    1[0m
+[33m  Actionable:         1[0m
+
+[1mFindings
+[0m───────────────────────────────────────────────────────────────
+[93m  High:     1[0m
+
+[93m[1m  [HIGH] OMI-001[0m
+[2m    Type:       [0m[36minvalid_free
+[0m[2m    Confidence: [0mMEDIUM (85%)
+[2m    Function:   [0m[37m_ZN7cpp_fftL3FFTEPdS0_mb
+[0m[2m    Detail:     [0m_ZdaPv() called on non-heap source pointer (confidence: 0.85% [cross-FFI alias detected])
+[35m[1m    ┌─ Detection Path ──
+[0m[2m    ├── [1][0m Free called on non-heap pointer
+[2m    ├── [2][0m Pointer origin: from _Znam()
+[2m    └── [3][0m Passed to _ZdaPv() which requires heap-allocated pointer  [91m✗[0m
+[35m    └──────────────────
+[0m[35m[1m    ┌─ Call Graph ──
+[0m    │
+[2m    │  [0m[37m_ZN7cpp_fftL3FFTEPdS0_mb[0m  ◄── [91mdetection point
+[0m[2m    ├── [0m[32mPointer origin: from _Znam()[0m[2m  ──source
+[0m[2m    └── [0m[91mPassed to _ZdaPv() which requires heap-allocated pointer[0m  [91m✗ BUG
+[0m[35m    └────────────────
+[0m
+[1mSummary
+[0m───────────────────────────────────────────────────────────────
+[93m  ⚡ 1 high-severity issue(s) found.
+[0m[2m  Analysis time: 10 ms
+[0m  (use --verbose for pipeline metrics, --debug for full trace)
+═══════════════════════════════════════════════════════════════

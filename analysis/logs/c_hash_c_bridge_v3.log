@@ -1,0 +1,26 @@
+[1m[34m═══════════════════════════════════════════════════════════════
+  OmniScope — Cross-Language Memory Safety Analysis
+═══════════════════════════════════════════════════════════════
+[0m
+[1mCoverage
+[0m───────────────────────────────────────────────────────────────
+  Functions:          12
+[91m  Issues detected:    1[0m
+  Actionable:         0
+
+[1mFindings
+[0m───────────────────────────────────────────────────────────────
+[2m  Low:      1[0m
+
+[90m[1m  [LOW] OMI-001[0m
+[2m    Type:       [0m[36mmemory_leak
+[0m[2m    Confidence: [0mHEURISTIC (50%)
+[2m    Function:   [0m[37mc_hash
+[0m[2m    Detail:     [0mPotential memory leak: heap allocation in c_hash() was never freed
+
+[1mSummary
+[0m───────────────────────────────────────────────────────────────
+[2m  · 1 low-severity finding(s). No immediate action required.
+[0m[2m  Analysis time: 7 ms
+[0m  (use --verbose for pipeline metrics, --debug for full trace)
+═══════════════════════════════════════════════════════════════

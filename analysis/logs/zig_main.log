@@ -1,0 +1,149 @@
+[1m[34m═══════════════════════════════════════════════════════════════
+  OmniScope — Cross-Language Memory Safety Analysis
+═══════════════════════════════════════════════════════════════
+[0m
+[1mCoverage
+[0m───────────────────────────────────────────────────────────────
+  Functions:          1128
+[91m  Issues detected:    16[0m
+  Actionable:         0
+
+[1mFindings
+[0m───────────────────────────────────────────────────────────────
+[96m  Medium:   8[0m
+[2m  Low:      8[0m
+
+[96m[1m  [MEDIUM] OMI-001[0m
+[2m    Type:       [0m[36mwrite_to_immutable
+[0m[2m    Confidence: [0mMEDIUM (85%)
+[2m    Function:   [0m[37mdebug.writeCurrentStackTrace
+[0m[2m    Detail:     [0mWrite to immutable memory via struct 'unknown_struct' field pointer — potential violation of immutability contract (CWE-757)
+[96m    ── Detection Summary ──
+[0m[2m      Start: [0mWrite through pointer loaded from struct field
+[2m      End:   [0mOriginal data owner may assume field content is read-only
+[2m      (+ 2 more steps, use --debug for full trace)
+[0m
+[96m[1m  [MEDIUM] OMI-002[0m
+[2m    Type:       [0m[36mcallback_ownership_risk
+[0m[2m    Confidence: [0mMEDIUM (78%)
+[2m    Function:   [0m[37mIo.Writer.defaultFlush
+[0m[2m    Detail:     [0mCallback ownership risk: fn param → @local_callback (local_alloca) — caller controls lifetime
+[96m    ── Detection Summary ──
+[0m[2m      Start: [0mFunction pointer parameter stored to persistent location
+[2m      End:   [0mIndirect call via this storage may use-after-return (CWE-825)
+[2m      (+ 2 more steps, use --debug for full trace)
+[0m
+[96m[1m  [MEDIUM] OMI-003[0m
+[2m    Type:       [0m[36mwrite_to_immutable
+[0m[2m    Confidence: [0mMEDIUM (85%)
+[2m    Function:   [0m[37mhash_map.HashMapUnmanaged([]const u8,debug.SelfInfo.Module__struct_2890.OFileInfo,hash_map.StringContext,80).getOrPutContext
+[0m[2m    Detail:     [0mWrite to immutable memory via struct 'unknown_struct' field pointer — potential violation of immutability contract (CWE-757)
+[96m    ── Detection Summary ──
+[0m[2m      Start: [0mWrite through pointer loaded from struct field
+[2m      End:   [0mOriginal data owner may assume field content is read-only
+[2m      (+ 2 more steps, use --debug for full trace)
+[0m
+[96m[1m  [MEDIUM] OMI-004[0m
+[2m    Type:       [0m[36mwrite_to_immutable
+[0m[2m    Confidence: [0mMEDIUM (85%)
+[2m    Function:   [0m[37mdebug.Dwarf.call_frame.readBlock
+[0m[2m    Detail:     [0mWrite to immutable memory via struct 'unknown_struct' field pointer — potential violation of immutability contract (CWE-757)
+[96m    ── Detection Summary ──
+[0m[2m      Start: [0mWrite through pointer loaded from struct field
+[2m      End:   [0mOriginal data owner may assume field content is read-only
+[2m      (+ 2 more steps, use --debug for full trace)
+[0m
+[96m[1m  [MEDIUM] OMI-005[0m
+[2m    Type:       [0m[36mwrite_to_immutable
+[0m[2m    Confidence: [0mMEDIUM (85%)
+[2m    Function:   [0m[37mdebug.SelfInfo.VirtualMachine.step
+[0m[2m    Detail:     [0mWrite to immutable memory via struct 'unknown_struct' field pointer — potential violation of immutability contract (CWE-757)
+[96m    ── Detection Summary ──
+[0m[2m      Start: [0mWrite through pointer loaded from struct field
+[2m      End:   [0mOriginal data owner may assume field content is read-only
+[2m      (+ 2 more steps, use --debug for full trace)
+[0m
+[96m[1m  [MEDIUM] OMI-006[0m
+[2m    Type:       [0m[36mwrite_to_immutable
+[0m[2m    Confidence: [0mMEDIUM (85%)
+[2m    Function:   [0m[37marray_hash_map.ArrayHashMapUnmanaged(u64,debug.Dwarf.CompileUnit.SrcLocCache.LineEntry,array_hash_map.AutoContext(u64),false).getOrPutContext
+[0m[2m    Detail:     [0mWrite to immutable memory via struct 'unknown_struct' field pointer — potential violation of immutability contract (CWE-757)
+[96m    ── Detection Summary ──
+[0m[2m      Start: [0mWrite through pointer loaded from struct field
+[2m      End:   [0mOriginal data owner may assume field content is read-only
+[2m      (+ 2 more steps, use --debug for full trace)
+[0m
+[96m[1m  [MEDIUM] OMI-007[0m
+[2m    Type:       [0m[36mwrite_to_immutable
+[0m[2m    Confidence: [0mMEDIUM (85%)
+[2m    Function:   [0m[37marray_hash_map.ArrayHashMapUnmanaged(u64,debug.Dwarf.CommonInformationEntry,array_hash_map.AutoContext(u64),false).getOrPutContext
+[0m[2m    Detail:     [0mWrite to immutable memory via struct 'unknown_struct' field pointer — potential violation of immutability contract (CWE-757)
+[96m    ── Detection Summary ──
+[0m[2m      Start: [0mWrite through pointer loaded from struct field
+[2m      End:   [0mOriginal data owner may assume field content is read-only
+[2m      (+ 2 more steps, use --debug for full trace)
+[0m
+[90m[1m  [LOW] OMI-008[0m
+[2m    Type:       [0m[36mborrow_escape
+[0m[2m    Confidence: [0mMEDIUM (70%)
+[2m    Function:   [0m[37mmain.doubleFreeDemo
+[0m[2m    Detail:     [0mFFI return value escape: c_alloc_buffer result in main.doubleFreeDemo (global=false, ret=false, ffi_reentry=false, uses=5)
+
+[90m[1m  [LOW] OMI-009[0m
+[2m    Type:       [0m[36minvalid_free
+[0m[2m    Confidence: [0mMEDIUM (85%)
+[2m    Function:   [0m[37mmain.doubleFreeDemo
+[0m[2m    Detail:     [0mFree memory - consumes ownership, cross-language mismatch risk
+
+[90m[1m  [LOW] OMI-010[0m
+[2m    Type:       [0m[36mffi_unsafe_call
+[0m[2m    Confidence: [0mHEURISTIC (60%)
+[2m    Function:   [0m[37mmain.doubleFreeDemo
+[0m[2m    Detail:     [0mFFI Boundary: main.doubleFreeDemo (go) -> free (c)
+Boundary Kind: external_unknown
+
+[90m[1m  [LOW] OMI-011[0m
+[2m    Type:       [0m[36mborrow_escape
+[0m[2m    Confidence: [0mMEDIUM (70%)
+[2m    Function:   [0m[37mmain.bufferOverflowDemo
+[0m[2m    Detail:     [0mFFI return value escape: c_alloc_buffer result in main.bufferOverflowDemo (global=false, ret=false, ffi_reentry=false, uses=5)
+
+[90m[1m  [LOW] OMI-012[0m
+[2m    Type:       [0m[36minvalid_free
+[0m[2m    Confidence: [0mMEDIUM (85%)
+[2m    Function:   [0m[37mmain.bufferOverflowDemo
+[0m[2m    Detail:     [0mFree memory - consumes ownership, cross-language mismatch risk
+
+[90m[1m  [LOW] OMI-013[0m
+[2m    Type:       [0m[36mffi_unsafe_call
+[0m[2m    Confidence: [0mHEURISTIC (60%)
+[2m    Function:   [0m[37mmain.bufferOverflowDemo
+[0m[2m    Detail:     [0mFFI Boundary: main.bufferOverflowDemo (go) -> free (c)
+Boundary Kind: external_unknown
+
+[90m[1m  [LOW] OMI-014[0m
+[2m    Type:       [0m[36mffi_unsafe_call
+[0m[2m    Confidence: [0mHEURISTIC (60%)
+[2m    Function:   [0m[37mdebug.getDebugInfoAllocator
+[0m[2m    Detail:     [0mFFI Boundary: debug.getDebugInfoAllocator (c) -> heap.arena_allocator.ArenaAllocator.init (zig)
+Boundary Kind: c_to_zig
+
+[90m[1m  [LOW] OMI-015[0m
+[2m    Type:       [0m[36mffi_unsafe_call
+[0m[2m    Confidence: [0mHEURISTIC (60%)
+[2m    Function:   [0m[37mdebug.SelfInfo.unwindFrameDwarf
+[0m[2m    Detail:     [0mFFI Boundary: debug.SelfInfo.unwindFrameDwarf (c) -> __zig_is_named_enum_value_@typeInfo(debug.SelfInfo.VirtualMachine.RegisterRule).@"union".tag_type.? (zig)
+Boundary Kind: c_to_zig
+
+[96m[1m  [MEDIUM] OMI-016[0m
+[2m    Type:       [0m[36mborrow_escape
+[0m[2m    Confidence: [0mMEDIUM (70%)
+[2m    Function:   [0m[37mheap.PageAllocator.map
+[0m[2m    Detail:     [0mFFI return value escape: mem.Alignment.toByteUnits result in heap.PageAllocator.map (global=false, ret=false, ffi_reentry=true, uses=4)
+
+[1mSummary
+[0m───────────────────────────────────────────────────────────────
+[96m  ○ 8 medium-severity issue(s) found. Review recommended.
+[0m[2m  Analysis time: 6970 ms
+[0m  (use --verbose for pipeline metrics, --debug for full trace)
+═══════════════════════════════════════════════════════════════

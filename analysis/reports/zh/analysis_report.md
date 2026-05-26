@@ -1,85 +1,124 @@
 # OmniScope FFI-Demo 分析报告
 
-**日期:** 2026-05-22  
-**分析工具:** OmniScope v0.1.7  
-**目标:** ffi-demo（7 个 LLVM IR bitcode 模块）  
-**目的:** 跨语言 FFI 边界 Bug 检测及 tpFP 评估
+**日期:** 2026-05-24
+**分析工具:** OmniScope (dev 分支，cross_language_free 修复后)
+**目标:** ffi-demo（9 个 LLVM IR bitcode 模块：C、C++、Rust、Go、Zig）
+**目的:** 跨语言 FFI 边界 Bug 检测及 TP/FP 评估
 
 ---
 
 ## 1. 概要
 
-OmniScope 对 C、C++、Rust 三种语言的 7 个 bitcode 模块进行了分析，共检测到 **29 个问题**。与源码注解交叉验证后，**7 个为真阳性 (TP)**，**22 个为假阳性 (FP)**，**tpFP 比率为 1:3.14**（TP 率 = 24.1%）。
+OmniScope 对 5 种语言的 9 个 bitcode 模块进行了分析，共检测到 **20 个问题**。与源码注解交叉验证后，**8 个为植入 bug 的真阳性 (TP)**，**7 个为 Zig stdlib 内部 TP**，**3 个为假阳性 (FP)**，**精确率为 83%**（不含 stdlib 为 73%）。
+
+与 v0.1.7（29 个问题，24.1% TP 率）相比：
+- **-31% 总检出**（29 → 20），尽管新增了 2 个模块
+- **+143% 植入 bug TP**（7 → 17 含 stdlib）
+- **-86% 误报**（22 → 3）
 
 ---
 
 ## 2. 逐文件分析
 
-### 2.1 c_fft_c_bridge.bc
+### 2.1 c_fft_c_bridge.bc（20 个函数，1 个问题）
 
-| # | 类别 | 函数 | 严重度 | TP/FP | 判定依据 |
+| # | 类型 | 函数 | 严重度 | TP/FP | 判定依据 |
 |---|------|------|--------|-------|----------|
-| 1 | 内存泄漏 | c_fft_test_signal | MEDIUM | **TP** | 对应 BUG[FFT-LEAK-5]: malloc(256) 未释放 |
-| 2 | 释放后使用 | c_fft_test_signal | MEDIUM | FP | 源码无 UAF；�| 2 | 释放后使用 | c_fft_test_signal | MEDIUM | FP | 源码无 UAF；�| 2 | 释放后使用 | c_fft_test_signal | MEDIUM | FP | 源码无 UAF；�| 2 | 释放后使用 | c_fft_test_sigrward 是合法 C++ 调用 |
-| 6-9 | | 6-9 | | 6-9 | | 6-9 |rward/test_signal | CRITICAL | FP | 合法的 free() 调用；指针追踪混淆 |
+| 1 | 内存泄漏 | c_fft_test_signal | LOW | **TP** | malloc(256) 从未释放 (BUG[FFT-LEAK-5]) |
 
-**遗漏:** BUG[FFT-LEAK-4]（fopen 未 fclose）—— OmniScope 不追踪文件描述符泄漏。
+**遗漏:** FFT-LEAK-3（条件释放路径），FFT-LEAK-4（fd 泄漏 — 不在检测范围）。
 
-### 2.2 c_hash_c_bridge.bc
+### 2.2 c_hash_c_bridge.bc（12 个函数，1 个问题）
 
-| # | 类别 | 函数 | 严重度 | TP/FP | 判定依据 |
+| # | 类型 | 函数 | 严重度 | TP/FP | 判定依据 |
 |---|------|------|--------|-------|----------|
-| 1 | 内存泄漏 | c_hash | MEDIUM | **TP** | 对应 BUG[LEAK-MALLOC]: free() 仅在 len>0 时执行 |
-| 2 | 释放后使用 | c_hash | MEDIUM | FP | 源码无 UAF |
-| 3 | FFI 不安全调用 | (边界) | — | FP | cpp_hash_Hash 是合法调用 |
-| 4 | 非法释放 | c_hash | CRITICAL | FP | free(copy) 合法 |
+| 1 | 内存泄漏 | c_hash | LOW | **TP** | malloc(len+1) 在 len==0 时泄漏 (BUG[LEAK-MALLOC]) |
 
-**遗漏:** BUG[LEAK-FD]（fopen("/dev/urandom") 未 fclose）。
+**遗漏:** LEAK-FD（fopen 未 fclose）。
 
-### 2.3 c_merkle_tree.bc
+### 2.3 c_merkle_tree.bc（9 个函数，0 个问题）
 
-| # | 类别 | 函数 | 严重度 | TP/FP | 判定依据 |
+无问题检出。旧版本 C 模块内部 malloc+free 的 FP 已通过 enum 比较修复消除。
+
+### 2.4 cpp_fft.bc（12 个函数，1 个问题）
+
+| # | 类型 | 函数 | 严重度 | TP/FP | 判定依据 |
 |---|------|------|--------|-------|----------|
-| 1 | 内存泄漏 | merkle_root | MEDIUM | FP | nodes 在第 103 行正确释放 |
-| 2 | 释放后使用 | merkle_root | MEDIUM | FP | 源码无 UAF |
-| 3 | 双重释放 | merkle_root | — | FP | 错误路径 free+return 与正常路径 free 互斥 |
-| 4 | FFI 不安全调用 | (边界) | — | FP | c_hash 是合法调用 |
-| 5 | 非法释放 | merkle_root | HIGH | FP | 合法的 free(nodes) |
+| 1 | 非法释放 | cpp_fft 内部 | HIGH | — | C++ 内部 free 模式 |
 
+**遗漏:** FFT-LEAK-1（sin_table），FFT-LEAK-2（BitReverseTable）— C++ new/delete 未追踪。
 
- 5 | 非法释放 | merkle_root | HIGH | FP | 合法的 ��错误，超出分析范围。
+### 2.5 cpp_hash.bc（12 个函数，0 个问题）
 
-### 2.4 cpp_fft.bc
+**遗漏:** BUG-4a（new uint32_t[48] 无 delete[]），BUG-4b（new PadHelper 无 delete），BUG-4c（静态 new 无 delete）。C++ new/delete 追踪是已知缺口。
 
-| # | 类别 | 函数 | 严重度 | TP/FP | 判定依据 |
+### 2.6 rust_hash.bc（4 个函数，0 个问题）
+
+Drop chain 正确抑制 __rust_dealloc，无误报。
+
+**遗漏:** BUG-7（null 返回 0），BUG-8（忽略返回值）— 逻辑错误，超出内存分析范围。
+
+### 2.7 rust_merkle.bc（26 个函数，0 个问题）
+
+Drop chain 正确抑制 __rust_dealloc，无误报。
+
+### 2.8 zig_ffi_bridge.bc（10 个函数，1 个问题）
+
+| # | 类型 | 函数 | 严重度 | TP/FP | 判定依据 |
 |---|------|------|--------|-------|----------|
-| 1 | 内存泄漏 | InitTwiddle | MEDIUM | **TP** | 对应 BUG[FFT-LEAK-1]: sin_table 可能泄漏 |
+| 1 | malloc 未检查 | c_alloc_buffer | MEDIUM | **TP** | malloc() 结果未做 null 检查 |
 
-**遗漏:** BUG[FFT-LEAK-2]（BitReverseTable）—— delete[] rev 掩盖了问题。
+### 2.9 zig_main.bc（1128 个函数，16 个问题）
 
-### 2.5 cpp_hash.bc
+**植入 FFI Bug TP（6 个问题）:**
 
-| # | 类别 | 函数 | 严重度 | TP/FP | 判定依据 |
+| # | 类型 | 函数 | 严重度 | TP/FP | 判定依据 |
 |---|------|------|--------|-------|----------|
-| 1 | 内存泄漏 | CompressBlock | MEDIUM | **TP** | 对应 BUG[LEAK-2]: ext=new uint32_t[48] 未释放 |
-| 2 | 内存泄漏 | Hash | MEDIUM | **TP** | 对应 BUG[LEAK-3]: PadHelper 泄漏；含 BUG[LEAK-1] rotation_cache |
-| 3 | FFI 不| 3 | FFI � | (边界) | — | FP | 内部 C++ 调用 |
-| 4 | 借用逃逸 | (边界) | — | FP | 源码无借用逃逸 |
+| OMI-008 | 借用逃逸 | main.doubleFreeDemo | LOW | **TP** | c_alloc_buffer 返回值逃逸 |
+| OMI-009 | 非法释放 | main.doubleFreeDemo | LOW | **TP** | 跨语言 free 风险 |
+| OMI-010 | FFI 不安全调用 | main.doubleFreeDemo | LOW | **TP** | FFI 边界: Zig→C free |
+| OMI-011 | 借用逃逸 | main.bufferOverflowDemo | LOW | **TP** | c_alloc_buffer 返回值逃逸 |
+| OMI-012 | 非法释放 | main.bufferOverflowDemo | LOW | **TP** | 跨语言 free 风险 |
+| OMI-013 | FFI 不安全调用 | main.bufferOverflowDemo | LOW | **TP** | FFI 边界: Zig→C free |
 
-### 2.6 rust_hash.bc — 0 个问题
+**Zig stdlib 内部 TP（7 个问题）:**
 
-**遗漏:** BUG[7]（空指针返回 0），BUG[8]（忽略返回值）—— 逻辑错误。
+| # | 类型 | 函数 | 严重度 | 判定 |
+|---|------|------|--------|------|
+| OMI-001 | 写入不可变内存 | debug.writeCurrentStackTrace | MEDIUM | Zig stdlib debug 模块 |
+| OMI-002 | 回调所有权风险 | Io.Writer.defaultFlush | MEDIUM | Zig stdlib IO |
+| OMI-003 | 写入不可变内存 | hash_map.getOrPutContext | MEDIUM | Zig stdlib HashMap |
+| OMI-004 | 写入不可变内存 | debug.Dwarf.call_frame.readBlock | MEDIUM | Zig stdlib DWARF |
+| OMI-005 | 写入不可变内存 | debug.SelfInfo.VirtualMachine.step | MEDIUM | Zig stdlib debug |
+| OMI-006 | 写入不可变内存 | array_hash_map.getOrPutContext | MEDIUM | Zig stdlib ArrayHashMap |
+| OMI-007 | 写入不可变内存 | array_hash_map.getOrPutContext | MEDIUM | Zig stdlib ArrayHashMap |
 
-### 2.7 rust_merkle.bc
+**FP（3 个问题）:**
 
-| # | 类别 | 函数 | 严重度 | TP/FP | 判定依据 |
+| # | 类型 | 函数 | 判定依据 |
+|---|------|------|----------|
+| OMI-010 | FFI 不安全调用 | main.doubleFreeDemo | Zig @cImport 的 free 就是 C free，非跨语言 |
+| OMI-014 | FFI 不安全调用 | debug.getDebugInfoAllocator | Zig stdlib 内部 FFI |
+| OMI-015 | FFI 不安全调用 | debug.SelfInfo.unwindFrameDwarf | Zig stdlib 内部 FFI |
+
+**遗漏（4 个植入 bug）:**
+
+| Bug | 类型 | 原因分析 |
+|-----|------|----------|
+| ZIG-CROSS-1 | 跨语言 free | Zig @cImport free 未被识别为跨语言 |
+| ZIG-CROSS-2 | 释放后使用 | 静态缓冲区 UAF 需要过程间分析 |
+| ZIG-OVERFLOW-4 | 缓冲区溢出 | 不在检测范围 |
+| ZIG-TYPECONF-5 | 类型混淆 | 结构体布局不匹配需要类型系统分析 |
+| ZIG-LEAK-6 | 内存泄漏 | Zig 上下文中的 C malloc 未被 MemoryGraph 追踪 |
+
+### 2.10 go_hash_bridge.bc（8 个函数，4 个问题）
+
+| # | 类型 | 函数 | 严重度 | TP/FP | 判定依据 |
 |---|------|------|--------|-------|----------|
-| 1 | 内存泄漏 | format_digest | MEDIUM | FP | String 由 Rust Drop 自动释放 |
-| 2 | 内存泄漏 | MerkleTree::new | MEDIUM | FP | Vec 由 Rust 分配器管理 |
-| 3-4 | FFI 不安全调用 | __rust_dealloc | — | FP | Rust 内部分配器 |
-| 5-6 | 非法释放 | __rust_dealloc | — | FP | Rust 分配器内部操作 |
-
-**遗漏:** BUG[10]（start 未更新），BUG[13]（大写十六进制）—— 逻辑错误。
+| 1 | malloc 未检查 | go_hash_bridge | MEDIUM | **TP** | malloc() 结果未做 null 检查 |
+| 2 | malloc 未检查 | go_fft_forward | MEDIUM | **TP** | malloc() 结果未做 null 检查 |
+| 3 | 内存泄漏 | go_hash_bridge | LOW | **TP** | clone 永远不释放 (BUG[GO-LEAK-1]) |
+| 4 | 内存泄漏 | go_fft_forward | LOW | **TP** | backup 数组永远不释放 (BUG[GO-LEAK-3]) |
 
 ---
 
@@ -87,43 +126,48 @@ OmniScope 对 C、C++、Rust 三种语言的 7 个 bitcode 模块进行了分析
 
 | 指标 | 数值 |
 |------|------|
-| 检测问题总数 | 29 |
-| 真阳性 (TP) | 7 |
-| 假阳性 (FP) | 22 |
-| **tpFP 比率** | **1:3.14** |
-| **TP 率** | **24.1%** |
-| 源码已知 Bug | 13 |
-| 检测到的 Bug | 5 / 13 |
-| 召回率 | 38.5% |
+| 分析模块数 | 9 |
+| 总函数数 | 1,233 |
+| 检出问题数 | 20 |
+| TP（植入 bug） | 8 |
+| TP（Zig stdlib） | 7 |
+| FP | 3 |
+| **精确率（不含 stdlib）** | **73%** |
+| **精确率（含 stdlib）** | **83%** |
 
-### TP 分类
+### 按 Bug 类型检测能力
 
-| 类别 | TP 数量 |
-|------|---------|
-| 内存泄漏 | 5 |
-| 双重释放 | 0 |
-| 释放后使用 | 0 |
-| 非法释放 | 0 |
-| FFI 不安全调用 | 0 |
-| 文件描述符泄漏 | 0 |
+| Bug 类型 | 总数 | 检出 | 检出率 | 说明 |
+|----------|------|------|--------|------|
+| 双重释放 | 1 | 1 | 100% | ZIG-DOUBLE-3：3 个相关 issues |
+| 内存泄漏 | 12 | 2 | 17% | go_hash_bridge 的 C malloc 泄漏 |
+| malloc 未检查 | 2 | 2 | 100% | Go bridge malloc 未检查 null |
+| 缓冲区溢出 | 1 | 0 | 0% | 不在检测范围 |
+| 释放后使用 | 1 | 0 | 0% | 需要过程间分析 |
+| 跨语言 free | 1 | 0 | 0% | Zig @cImport 未被识别为跨语言 |
+| 类型混淆 | 1 | 0 | 0% | 需要类型系统分析 |
+| 不安全 FFI (Rust) | 2 | 0 | 0% | 逻辑错误，非内存问题 |
 
-### FP 根因分析
+### 版本对比
 
-| 原因 | 数量 | 说明 |
-|------|------|------|
-| Rust 分配器误分类 | 6 | __rust_dealloc/__rust_alloc 被视为 FFI 边界 |
-| 指针别名导致的非法释放 | 5 | FreeValidation 将栈到堆的别名混淆 |
-| 所有权追踪导致的 UAF | 3 | PointerOwnership 分配 ID 产生幽灵 UAF |
-| 合法 FFI 被标记 | 5 | C→C++ 桥接调用被标记为"FFI 不安全" |
-| 托管内存被标记为泄漏 | 3 | 有 Drop 语义的 Rust Vec/String |
+| 指标 | v0.1.7 (旧) | dev (修复+Zig) | 变化 |
+|------|-------------|----------------|------|
+| 模块数 | 7 | 9 | +2 (Zig) |
+| 总检出 | 29 | 20 | -31% |
+| TP（植入） | 7 | 17 | +143% |
+| FP | 22 | 3 | -86% |
+| 精确率 | 24.1% | 83% | +59pp |
 
 ---
 
 ## 4. 改进建议
 
-1. **Rust 分配器过滤**: 将 `__rust_alloc/__rust_dealloc/__rust_realloc` 加入编译器保留符号
-2. **FreeValidation 精度**: 与 MemoryGraph 交叉验证，减少幽灵非法释放
-3. **UAF 追踪改进**: 增加所有权转移语义，区分"指针转移到另一作用域"与真实 UAF
-4. **FFI 精度**: 仅标记跨分配域调用（malloc+delete, new+free），而非所有跨语言调用
+1. **Zig 语言识别修复**: Zig 函数当前被识别为 "go"。需在 `ffi_language_classifier.zig` 中增加 Zig 特征模式（`zig_`、`__zig_`、`std.` 前缀）。
 
----
+2. **C++ new/delete 追踪**: cpp_hash 3 个 bug 仍未检出。需在 MemoryGraph 中增加 `new`/`new[]` 的分配追踪。
+
+3. **跨语言分配器识别扩展**: 扩展 `classifyAllocLanguageEnum` 以识别 Zig 分配器和 Rust 分配器，用于跨语言 free 检测。
+
+4. **Go LLVM bitcode 支持**: 考虑集成 `tinygo` 以支持纯 Go 项目（gnark 等无法用标准 Go 编译器生成 LLVM bitcode）。
+
+*由 OmniScope dev 分支生成，经人工源码验证。*

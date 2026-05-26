@@ -2,9 +2,6 @@
 build/
 output/
 
-# LLVM output
-llvm-output/
-
 # C/C++
 *.o
 *.a

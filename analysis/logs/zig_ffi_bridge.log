@@ -1,0 +1,30 @@
+[1m[34m═══════════════════════════════════════════════════════════════
+  OmniScope — Cross-Language Memory Safety Analysis
+═══════════════════════════════════════════════════════════════
+[0m
+[1mCoverage
+[0m───────────────────────────────────────────────────────────────
+  Functions:          10
+[91m  Issues detected:    1[0m
+  Actionable:         0
+
+[1mFindings
+[0m───────────────────────────────────────────────────────────────
+[96m  Medium:   1[0m
+
+[96m[1m  [MEDIUM] OMI-001[0m
+[2m    Type:       [0m[36mmalloc_unchecked
+[0m[2m    Confidence: [0mMEDIUM (85%)
+[2m    Function:   [0m[37mc_alloc_buffer
+[0m[2m    Detail:     [0mmalloc() result used without null check (confidence: 85.00%)
+[96m    ── Detection Summary ──
+[0m[2m      Start: [0mAllocation function called without null check
+[2m      End:   [0mPointer used in unknown instruction without prior null check
+[2m      (+ 1 more steps, use --debug for full trace)
+[0m
+[1mSummary
+[0m───────────────────────────────────────────────────────────────
+[96m  ○ 1 medium-severity issue(s) found. Review recommended.
+[0m[2m  Analysis time: 5 ms
+[0m  (use --verbose for pipeline metrics, --debug for full trace)
+═══════════════════════════════════════════════════════════════
