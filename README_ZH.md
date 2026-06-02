@@ -7,7 +7,7 @@
 
 ### 概述
 
-本项目演示了**五种语言**（C++、C、Rust、Go、Python）之间的外部函数接口（FFI）互操作性。在 C++ 中实现了两项核心算法——**SHA-256 哈希**和**快速傅里叶变换（Cooley-Tukey 基-2）**——并通过精心设计的 FFI 链暴露给上层语言。
+本项目演示了 **C/C++、C#、Rust、Go、Python、Zig、Java** 之间的外部函数接口（FFI）互操作性。在 C++ 中实现核心算法——**SHA-256 哈希**和**快速傅里叶变换（Cooley-Tukey 基-2）**；C/C++ 算法层保留少量实现瑕疵，但重点缺陷集中在跨语言 FFI 边界的所有权、生命周期、ABI 布局和长度语义错配。
 
 **主要用途**：这是一个为 **[OmniScope](https://github.com/Timwood0x10/OmniScope)** 项目设计的代码审查训练和测试工具。每个源文件都包含**故意设置的缺陷**（以 `// BUG[n]:` 注释标注），用于测试审查者发现微妙问题的能力——主要是内存泄漏和资源管理错误。
 
@@ -24,6 +24,7 @@ graph TB
         HASH_BRIDGE["hash_c_bridge.c"]
         FFT_BRIDGE["fft_c_bridge.c"]
         GO_BRIDGE["go_hash_bridge.c"]
+        TRAPS["ffi_traps.c<br/>所有权/回调/ABI 陷阱"]
     end
 
     subgraph RUST["Rust FFI"]
@@ -35,6 +36,9 @@ graph TB
         C_PROG["C 程序<br/>merkle_tree<br/>C → C++"]
         PYTHON["Python (ctypes)<br/>Python → C → C++"]
         GO["Go (cgo)<br/>main.go<br/>Go → C → Rust → C → C++"]
+        CSHARP["C# P/Invoke<br/>Native handle traps"]
+        ZIG["Zig @cImport<br/>Zig → C"]
+        JAVA["Java JNI/JNA-style<br/>Source-level traps"]
     end
 
     HASH --> HASH_BRIDGE
@@ -54,6 +58,13 @@ graph TB
     GO_BRIDGE --> RUST_HASH
     RUST_HASH --> GO
     FFT_BRIDGE --> GO
+    TRAPS --> C_PROG
+    TRAPS --> PYTHON
+    TRAPS --> GO
+    TRAPS --> RUST_MERKLE
+    TRAPS --> CSHARP
+    TRAPS --> ZIG
+    TRAPS --> JAVA
 
     style CPP fill:#e1f5ff
     style C_BRIDGE fill:#fff4e1
@@ -69,6 +80,9 @@ graph TB
 | **Rust** | `Rust → C (c_hash) → C++ (Hash)` | `Rust → C (c_fft_forward) → C++ (FFTForward)` |
 | **Go** | `Go → C (go_hash_bridge) → Rust (rust_hash_compute) → C (c_hash) → C++ (Hash)` | `Go → C (c_fft_forward) → C++ (FFTForward)` |
 | **Python** | `Python → C (c_hash) → C++ (Hash)` | `Python → C (c_fft_forward) → C++ (FFTForward)` |
+| **C#** | `C# → P/Invoke → C trap API` | allocator / borrowed pointer / length traps |
+| **Zig** | `Zig → @cImport → C trap API` | ownership / alias / exact-buffer traps |
+| **Java** | `Java → JNI/JNA-style native handles → C trap API` | source-level handle ownership traps |
 
 ### 故意设置的缺陷
 
@@ -88,6 +102,19 @@ graph TB
 | `GO-LEAK-1` | `c/go_hash_bridge.c` | 数据克隆已分配但从未释放 | 每次哈希调用泄漏 `sizeof(data)` 字节 |
 | `GO-LEAK-2` | `c/go_hash_bridge.c` | 克隆毫无意义——实际使用了原始数据 | 同上 |
 | `GO-FFT-LEAK` | `go/main.go` | C 数组已分配但仅在成功路径上释放 | 每次 FFT 泄漏 `2 * n * 8` 字节 |
+
+#### FFI 边界陷阱（新增重点）
+
+| Bug ID | 位置 | 描述 | 重点能力 |
+|--------|------|------|----------|
+| `TRAP-C-1` | `c/ffi_traps.c` | C 返回 owning `malloc` 字符串，但绑定层容易当 borrowed 用 | 跨语言所有权识别 |
+| `TRAP-C-2` | `c/ffi_traps.c` | 返回 borrowed static buffer，API 形状近似 owning 指针 | invalid free / API 语义区分 |
+| `TRAP-C-3` | `c/ffi_traps.c` | `struct ffi_packet` 含 padding、`size_t`、指针字段 | ABI/布局错配 |
+| `TRAP-C-4` | `c/ffi_traps.c` | 上层 `usize/long` 到 C `uint32_t` 的长度截断诱饵 | 整数截断跨 FFI 追踪 |
+| `TRAP-C-5` | `c/ffi_traps.c` | exact-size output 下 NUL 终止符越界写 | 边界条件越界 |
+| `TRAP-C-6` | `c/ffi_traps.c` | callback registry 保存 stack pointer，延迟触发 | 分离式生命周期/UAF |
+| `TRAP-C-7` | `c/ffi_traps.c` | 返回 caller-owned buffer 的内部别名 | alias ownership / 悬垂引用 |
+| `GO/RUST/PY/CS/ZIG/JAVA-FFI-*` | 各语言入口 | 对 trap API 的错误绑定和清理策略 | 跨语言污点与所有权传播 |
 
 #### 算法与逻辑缺陷
 
@@ -141,6 +168,7 @@ ffi-demo/
 ├── c/                # C 桥接层
 │   ├── hash_c_bridge.{h,c}   # C++ 哈希的 C 包装
 │   ├── fft_c_bridge.{h,c}    # C++ FFT 的 C 包装
+│   ├── ffi_traps.{h,c}       # 隐蔽 FFI 所有权/布局/生命周期陷阱
 │   ├── go_hash_bridge.{h,c}  # Go → Rust 调用的 C 函数
 │   ├── merkle_tree.{h,c}     # C 语言 Merkle 树
 │   └── main.c                # C 测试程序（Merkle + FFT）
@@ -157,6 +185,9 @@ ffi-demo/
 │   └── main.go
 ├── python/            # Python: ctypes FFI
 │   └── merkle_tree.py
+├── csharp/            # C#: P/Invoke FFI 陷阱
+├── zig/               # Zig: @cImport FFI 陷阱
+├── java/              # Java: JNI/JNA-style source-level FFI 陷阱
 ├── Makefile           # 构建全部
 └── README.md          # 本文件
 ```

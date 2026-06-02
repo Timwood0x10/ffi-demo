@@ -9,9 +9,9 @@
 
 ### Overview
 
-This project demonstrates Foreign Function Interface (FFI) interoperability across **five languages**: C++, C, Rust, Go, and Python. It implements two core algorithms in C++ — **SHA-256 hashing** and **Fast Fourier Transform (Cooley-Tukey radix-2)** — and exposes them to upper-level languages through a carefully orchestrated FFI chain.
+This project demonstrates Foreign Function Interface (FFI) interoperability across **C/C++, C#, Rust, Go, Python, Zig, and Java**. C++ owns the core algorithms — **SHA-256 hashing** and **Fast Fourier Transform (Cooley-Tukey radix-2)** — while the more interesting defects live at FFI boundaries: ownership, lifetime, ABI layout, callback, and length semantics.
 
-**Primary purpose**: This is a code review training and testing tool designed for the **[OmniScope](https://github.com/Timwood0x10/OmniScope)** project. Each source file contains **intentional bugs** (annotated with `// BUG[n]:` comments) that test a reviewer's ability to identify subtle issues — primarily memory leaks and resource management errors.
+**Primary purpose**: This is a code review training and testing tool designed for the **[OmniScope](https://github.com/Timwood0x10/OmniScope)** project. Source files contain **intentional bugs** (annotated with `// BUG[n]:` or `// BUG[NAME]:`) that test whether an analyzer can follow subtle cross-language resource and lifetime flows.
 
 ### Architecture
 
@@ -26,6 +26,7 @@ graph TB
         HASH_BRIDGE["hash_c_bridge.c"]
         FFT_BRIDGE["fft_c_bridge.c"]
         GO_BRIDGE["go_hash_bridge.c"]
+        TRAPS["ffi_traps.c<br/>ownership/lifetime/layout traps"]
     end
 
     subgraph RUST["Rust FFI"]
@@ -37,6 +38,9 @@ graph TB
         C_PROG["C Program<br/>merkle_tree<br/>C → C++"]
         PYTHON["Python (ctypes)<br/>Python → C → C++"]
         GO["Go (cgo)<br/>main.go<br/>Go → C → Rust → C → C++"]
+        CSHARP["C# P/Invoke"]
+        ZIG["Zig @cImport"]
+        JAVA["Java JNI/JNA-style"]
     end
 
     HASH --> HASH_BRIDGE
@@ -56,6 +60,13 @@ graph TB
     GO_BRIDGE --> RUST_HASH
     RUST_HASH --> GO
     FFT_BRIDGE --> GO
+    TRAPS --> C_PROG
+    TRAPS --> PYTHON
+    TRAPS --> GO
+    TRAPS --> RUST_MERKLE
+    TRAPS --> CSHARP
+    TRAPS --> ZIG
+    TRAPS --> JAVA
 
     style CPP fill:#e1f5ff
     style C_BRIDGE fill:#fff4e1
@@ -71,6 +82,7 @@ graph TB
 | **Rust** | `Rust → C (c_hash) → C++ (Hash)` | `Rust → C (c_fft_forward) → C++ (FFTForward)` |
 | **Go** | `Go → C (go_hash_bridge) → Rust (rust_hash_compute) → C (c_hash) → C++ (Hash)` | `Go → C (c_fft_forward) → C++ (FFTForward)` |
 | **Python** | `Python → C (c_hash) → C++ (Hash)` | `Python → C (c_fft_forward) → C++ (FFTForward)` |
+| **C#/Zig/Java** | `language → C trap API` | ownership / layout / callback / length traps |
 
 ### Intentional Bugs
 

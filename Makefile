@@ -9,16 +9,15 @@
 #   - Rust Merkle tree (calls C bridge)
 #   - C Merkle tree + FFT (calls C bridge)
 #   - Go Merkle tree + FFT (complex chain: Go -> C -> Rust -> C -> C++)
-#   - Swift Merkle tree + FFT (calls C bridge → C++)
 #   - Python Merkle tree + FFT (calls C bridge via ctypes)
 #   - Zig FFI bug demo (Zig → C via @cImport, intentional memory bugs)
+#   - Java source-level FFI trap demo (JNA/JNI-style native handles)
 #   - LLVM bitcode (.bc) and LLVM IR (.ll) for each language component
 #
 # Requirements:
 #   - clang/clang++ (LLVM 21.1.8) from /opt/homebrew/opt/llvm@21/
 #   - Go 1.26+
 #   - Rust/Cargo 1.95+
-#   - Swift 6+
 #   - Python 3.14+
 #   - Zig 0.15+
 #   - make
@@ -41,20 +40,20 @@ GO            := go
 CARGO         := cargo
 RUSTC         := rustc
 PYTHON        := python3
-SWIFTC        := swiftc
 ZIG           := zig
 MKDIR_P       := mkdir -p
 
 # ─── Directories ─────────────────────────────────────────────────────────────
 BUILD_DIR     := build
+ZIG_CACHE     := $(CURDIR)/$(BUILD_DIR)/zig-cache
 CPP_DIR       := cpp
 C_DIR         := c
 RUST_HASH_DIR := rust_hash
 RUST_MERKLE_DIR := rust_merkle
 GO_DIR        := go
-SWIFT_DIR     := swift
 PYTHON_DIR    := python
 ZIG_DIR       := zig
+JAVA_DIR      := java
 
 # ─── LLVM Flags ──────────────────────────────────────────────────────────────
 LLVM_CFLAGS   := -O2 -emit-llvm
@@ -67,11 +66,11 @@ LLVM_OUTPUT   := llvm-output
 
 # ─── Targets ─────────────────────────────────────────────────────────────────
 .PHONY: all build-dirs clean
-.PHONY: cpp c rust-hash rust-merkle go swift python zig
+.PHONY: cpp c rust-hash rust-merkle go python zig java
 .PHONY: llvm-bitcode llvm-ir
 .PHONY: check test
 
-all: build-dirs cpp c rust-hash rust-merkle go swift python zig llvm-bitcode $(LLVM_OUTPUT)
+all: build-dirs cpp c rust-hash rust-merkle go python zig java llvm-bitcode $(LLVM_OUTPUT)
 	@echo ""
 	@echo "=== Build complete ==="
 	@echo "Run 'make check' to verify all outputs."
@@ -84,9 +83,9 @@ build-dirs:
 	$(MKDIR_P) $(BUILD_DIR)/rust_hash
 	$(MKDIR_P) $(BUILD_DIR)/rust_merkle
 	$(MKDIR_P) $(BUILD_DIR)/go
-	$(MKDIR_P) $(BUILD_DIR)/swift
 	$(MKDIR_P) $(BUILD_DIR)/python
 	$(MKDIR_P) $(BUILD_DIR)/zig
+	$(MKDIR_P) $(BUILD_DIR)/java
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # C++ Core Algorithms (SHA-256 Hash + FFT)
@@ -156,9 +155,16 @@ C_FFT_BRIDGE_LL  := $(BUILD_DIR)/c/fft_c_bridge.ll
 GO_BRIDGE_OBJ  := $(BUILD_DIR)/c/go_hash_bridge.o
 GO_BRIDGE_LIB  := $(BUILD_DIR)/c/libgo_hash_bridge.a
 
+FFI_TRAPS_OBJ  := $(BUILD_DIR)/c/ffi_traps.o
+FFI_TRAPS_LIB  := $(BUILD_DIR)/c/libffi_traps.a
+FFI_TRAPS_DYLIB := $(BUILD_DIR)/c/libffi_traps.dylib
+FFI_TRAPS_BC   := $(BUILD_DIR)/c/ffi_traps.bc
+FFI_TRAPS_LL   := $(BUILD_DIR)/c/ffi_traps.ll
+
 c-bridge: $(C_BRIDGE_OBJ) $(C_BRIDGE_LIB) $(C_BRIDGE_BC) $(C_BRIDGE_LL) \
           $(C_FFT_BRIDGE_OBJ) $(C_FFT_BRIDGE_LIB) $(C_FFT_BRIDGE_BC) $(C_FFT_BRIDGE_LL) \
-          $(GO_BRIDGE_OBJ) $(GO_BRIDGE_LIB)
+          $(GO_BRIDGE_OBJ) $(GO_BRIDGE_LIB) \
+          $(FFI_TRAPS_OBJ) $(FFI_TRAPS_LIB) $(FFI_TRAPS_DYLIB) $(FFI_TRAPS_BC) $(FFI_TRAPS_LL)
 
 # hash_c_bridge.c is compiled with C++ to avoid name mangling issues (BUG[6])
 $(C_BRIDGE_OBJ): $(C_DIR)/hash_c_bridge.c $(C_DIR)/hash_c_bridge.h $(CPP_DIR)/hash.h | build-dirs
@@ -193,6 +199,21 @@ $(GO_BRIDGE_OBJ): $(C_DIR)/go_hash_bridge.c $(C_DIR)/go_hash_bridge.h | build-di
 $(GO_BRIDGE_LIB): $(GO_BRIDGE_OBJ)
 	ar rcs $@ $^
 
+$(FFI_TRAPS_OBJ): $(C_DIR)/ffi_traps.c $(C_DIR)/ffi_traps.h | build-dirs
+	$(CC) $(C_STD) -c -o $@ $(C_DIR)/ffi_traps.c
+
+$(FFI_TRAPS_LIB): $(FFI_TRAPS_OBJ)
+	ar rcs $@ $^
+
+$(FFI_TRAPS_DYLIB): $(FFI_TRAPS_OBJ)
+	$(CC) -shared -o $@ $^
+
+$(FFI_TRAPS_BC): $(C_DIR)/ffi_traps.c $(C_DIR)/ffi_traps.h | build-dirs
+	$(CC) $(C_STD) $(LLVM_CFLAGS) -c -o $@ $(C_DIR)/ffi_traps.c
+
+$(FFI_TRAPS_LL): $(C_DIR)/ffi_traps.c $(C_DIR)/ffi_traps.h | build-dirs
+	$(CC) $(C_STD) $(LLVM_CFLAGS) -S -c -o $@ $(C_DIR)/ffi_traps.c
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # C Merkle Tree + FFT (standalone C program)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -217,9 +238,9 @@ $(C_MERKLE_BC): $(C_DIR)/merkle_tree.c $(C_DIR)/merkle_tree.h $(C_DIR)/hash_c_br
 $(C_MERKLE_LL): $(C_DIR)/merkle_tree.c $(C_DIR)/merkle_tree.h $(C_DIR)/hash_c_bridge.h | build-dirs
 	$(CXX) $(CXX_STD) $(LLVM_CFLAGS) -S -c -o $@ $(C_DIR)/merkle_tree.c
 
-$(C_MERKLE_BIN): $(C_MERKLE_OBJ) $(C_BRIDGE_OBJ) $(C_FFT_BRIDGE_OBJ) $(CPP_HASH_OBJ) $(CPP_FFT_OBJ) $(C_DIR)/main.c
+$(C_MERKLE_BIN): $(C_MERKLE_OBJ) $(C_BRIDGE_OBJ) $(C_FFT_BRIDGE_OBJ) $(FFI_TRAPS_OBJ) $(CPP_HASH_OBJ) $(CPP_FFT_OBJ) $(C_DIR)/main.c
 	$(CXX) $(CXX_STD) -c -o $(C_MAIN_OBJ) $(C_DIR)/main.c
-	$(CXX) -o $@ $(C_MAIN_OBJ) $(C_MERKLE_OBJ) $(C_BRIDGE_OBJ) $(C_FFT_BRIDGE_OBJ) $(CPP_HASH_OBJ) $(CPP_FFT_OBJ)
+	$(CXX) -o $@ $(C_MAIN_OBJ) $(C_MERKLE_OBJ) $(C_BRIDGE_OBJ) $(C_FFT_BRIDGE_OBJ) $(FFI_TRAPS_OBJ) $(CPP_HASH_OBJ) $(CPP_FFT_OBJ)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Rust Hash Wrapper (extern "C", calls C bridge -> C++ hash + FFT)
@@ -315,13 +336,14 @@ $(RUST_MERKLE_BC): $(RUST_MERKLE_DIR)/Cargo.toml $(RUST_MERKLE_DIR)/src/lib.rs |
 	if [ -n "$$BC_FILE" ]; then cp "$$BC_FILE" $@; \
 	else echo "WARNING: rust_merkle.bc not generated"; fi
 
-$(RUST_MERKLE_BIN): $(RUST_MERKLE_DIR)/Cargo.toml $(RUST_MERKLE_DIR)/src/lib.rs $(RUST_MERKLE_DIR)/src/main.rs $(C_BRIDGE_LIB) $(CPP_LIB)
+$(RUST_MERKLE_BIN): $(RUST_MERKLE_DIR)/Cargo.toml $(RUST_MERKLE_DIR)/src/lib.rs $(RUST_MERKLE_DIR)/src/main.rs $(C_BRIDGE_LIB) $(FFI_TRAPS_LIB) $(CPP_LIB)
 	cd $(RUST_MERKLE_DIR) && \
 		$(CARGO) rustc --release --bin rust_merkle -- \
 			-L $(abspath $(BUILD_DIR)/c) \
 			-L $(abspath $(BUILD_DIR)/cpp) \
 			-l static=hash_c_bridge \
 			-l static=fft_c_bridge \
+			-l static=ffi_traps \
 			-l static=cpp_core \
 			-l c++
 	cp $(RUST_MERKLE_DIR)/target/release/rust_merkle $@
@@ -341,10 +363,10 @@ GO_BC_NOTE    := $(BUILD_DIR)/go/README.md
 
 go: c-bridge rust-hash $(GO_BRIDGE_OBJ) $(GO_BRIDGE_LIB) $(GO_BIN) $(GO_BC_NOTE)
 
-$(GO_BIN): $(GO_DIR)/main.go $(GO_DIR)/go.mod $(GO_BRIDGE_LIB) $(RUST_HASH_LIB) $(C_BRIDGE_LIB) $(C_FFT_BRIDGE_LIB) $(CPP_LIB)
+$(GO_BIN): $(GO_DIR)/main.go $(GO_DIR)/go.mod $(GO_BRIDGE_LIB) $(RUST_HASH_LIB) $(C_BRIDGE_LIB) $(C_FFT_BRIDGE_LIB) $(FFI_TRAPS_LIB) $(CPP_LIB)
 	cd $(GO_DIR) && \
 		CGO_ENABLED=1 \
-		CGO_LDFLAGS="-L$(abspath $(BUILD_DIR)/c) -L$(abspath $(BUILD_DIR)/rust_hash) -L$(abspath $(BUILD_DIR)/cpp) -lgo_hash_bridge -lrust_hash -lhash_c_bridge -lfft_c_bridge -lcpp_core -lc++" \
+		CGO_LDFLAGS="-L$(abspath $(BUILD_DIR)/c) -L$(abspath $(BUILD_DIR)/rust_hash) -L$(abspath $(BUILD_DIR)/cpp) -lgo_hash_bridge -lrust_hash -lhash_c_bridge -lfft_c_bridge -lffi_traps -lcpp_core -lc++" \
 		$(GO) build -o $(abspath $@) main.go
 
 $(GO_BC_NOTE):
@@ -360,54 +382,6 @@ $(GO_BC_NOTE):
 	@echo 'To build the Go binary (with full complex chain), run: make go' >> $@
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Swift Merkle Tree + FFT (Swift → C bridge → C++)
-# ═══════════════════════════════════════════════════════════════════════════════
-# Files: swift/main.swift
-# Dependencies: hash_c_bridge.o, fft_c_bridge.o, cpp objects
-#
-# Swift calls the C bridge functions (c_hash, c_fft_forward, c_fft_inverse)
-# directly via the C bridging header. The C bridge in turn calls C++.
-#
-# LLVM Bitcode: Swift's standard compiler does NOT emit LLVM bitcode in the
-# same way as clang. The C dependencies ARE available as .bc files.
-# ───────────────────────────────────────────────────────────────────────────────
-
-SWIFT_BIN     := $(BUILD_DIR)/swift/swift_merkle
-SWIFT_BC_NOTE := $(BUILD_DIR)/swift/README.md
-
-swift: c-bridge $(SWIFT_BIN) $(SWIFT_BC_NOTE)
-
-# Create a bridging header that includes the C bridge headers for Swift
-$(BUILD_DIR)/swift/bridging-header.h: $(C_DIR)/hash_c_bridge.h $(C_DIR)/fft_c_bridge.h | build-dirs
-	@echo '#ifndef SWIFT_BRIDGING_HEADER_H' > $@
-	@echo '#define SWIFT_BRIDGING_HEADER_H' >> $@
-	@echo '#include "../../c/hash_c_bridge.h"' >> $@
-	@echo '#include "../../c/fft_c_bridge.h"' >> $@
-	@echo '#endif' >> $@
-
-$(SWIFT_BIN): $(SWIFT_DIR)/main.swift $(BUILD_DIR)/swift/bridging-header.h $(C_BRIDGE_OBJ) $(C_FFT_BRIDGE_OBJ) $(CPP_HASH_OBJ) $(CPP_FFT_OBJ)
-	$(SWIFTC) \
-		-import-objc-header $(BUILD_DIR)/swift/bridging-header.h \
-		-I $(C_DIR) \
-		-I $(CPP_DIR) \
-		-o $@ \
-		$(SWIFT_DIR)/main.swift \
-		$(C_BRIDGE_OBJ) $(C_FFT_BRIDGE_OBJ) $(CPP_HASH_OBJ) $(CPP_FFT_OBJ) \
-		-lc++
-
-$(SWIFT_BC_NOTE):
-	@echo '# Swift Merkle Tree — LLVM Bitcode' > $@
-	@echo '' >> $@
-	@echo 'Swift (swiftc) does not natively emit LLVM bitcode in the same way as clang.' >> $@
-	@echo 'The C bridge components used by Swift ARE available as LLVM bitcode:' >> $@
-	@echo '  - build/c/hash_c_bridge.bc' >> $@
-	@echo '  - build/c/fft_c_bridge.bc' >> $@
-	@echo '  - build/cpp/hash.bc (C++ SHA-256)' >> $@
-	@echo '  - build/cpp/fft.bc (C++ FFT)' >> $@
-	@echo '' >> $@
-	@echo 'To build the Swift binary: make swift' >> $@
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # Python Merkle Tree + FFT (calls C bridge via ctypes)
 # ═══════════════════════════════════════════════════════════════════════════════
 # Python is interpreted and does not produce LLVM bitcode.
@@ -419,7 +393,7 @@ PYTHON_BC_NOTE := $(BUILD_DIR)/python/README.md
 
 python: cpp c-bridge $(PYTHON_LIB) $(PYTHON_BC_NOTE)
 
-$(PYTHON_LIB): $(C_BRIDGE_OBJ) $(C_FFT_BRIDGE_OBJ) $(CPP_HASH_OBJ) $(CPP_FFT_OBJ)
+$(PYTHON_LIB): $(C_BRIDGE_OBJ) $(C_FFT_BRIDGE_OBJ) $(FFI_TRAPS_OBJ) $(CPP_HASH_OBJ) $(CPP_FFT_OBJ)
 	$(CXX) -shared -o $@ $^ -lc
 
 $(PYTHON_BC_NOTE):
@@ -468,25 +442,32 @@ $(ZIG_BRIDGE_LL): $(ZIG_DIR)/zig_ffi_bridge.c $(ZIG_DIR)/zig_ffi_bridge.h | buil
 	$(CC) $(C_STD) $(LLVM_CFLAGS) -S -c -o $@ $(ZIG_DIR)/zig_ffi_bridge.c
 
 # Zig module — emit LLVM bitcode and IR natively
-$(ZIG_MAIN_BC): $(ZIG_DIR)/main.zig $(ZIG_DIR)/zig_ffi_bridge.h | build-dirs
-	cd $(ZIG_DIR) && $(ZIG) build-obj main.zig \
+$(ZIG_MAIN_BC): $(ZIG_DIR)/main.zig $(ZIG_DIR)/zig_ffi_bridge.h $(C_DIR)/ffi_traps.h | build-dirs
+	cd $(ZIG_DIR) && ZIG_GLOBAL_CACHE_DIR=$(ZIG_CACHE) $(ZIG) build-obj main.zig \
 		-femit-llvm-bc=$(abspath $@) \
 		-fno-lto \
-		-I .
+		-I . \
+		-I ../c
 
-$(ZIG_MAIN_LL): $(ZIG_DIR)/main.zig $(ZIG_DIR)/zig_ffi_bridge.h | build-dirs
-	cd $(ZIG_DIR) && $(ZIG) build-obj main.zig \
+$(ZIG_MAIN_LL): $(ZIG_DIR)/main.zig $(ZIG_DIR)/zig_ffi_bridge.h $(C_DIR)/ffi_traps.h | build-dirs
+	cd $(ZIG_DIR) && ZIG_GLOBAL_CACHE_DIR=$(ZIG_CACHE) $(ZIG) build-obj main.zig \
 		-femit-llvm-ir=$(abspath $@) \
 		-fno-lto \
-		-I .
+		-I . \
+		-I ../c
 
 # Zig binary (links with C bridge)
-$(ZIG_BIN): $(ZIG_DIR)/main.zig $(ZIG_DIR)/zig_ffi_bridge.h $(ZIG_BRIDGE_OBJ) | build-dirs
-	cd $(ZIG_DIR) && $(ZIG) build-exe main.zig \
+$(ZIG_BIN): $(ZIG_DIR)/main.zig $(ZIG_DIR)/zig_ffi_bridge.h $(C_DIR)/ffi_traps.h $(ZIG_BRIDGE_OBJ) $(FFI_TRAPS_OBJ) | build-dirs
+	cd $(ZIG_DIR) && ZIG_GLOBAL_CACHE_DIR=$(ZIG_CACHE) $(ZIG) build-exe main.zig \
 		$(abspath $(ZIG_BRIDGE_OBJ)) \
+		$(abspath $(FFI_TRAPS_OBJ)) \
 		-I . \
+		-I ../c \
 		-lc \
 		-femit-bin=$(abspath $@)
+
+java: $(JAVA_DIR)/FfiTrapDemo.java | build-dirs
+	@echo "Java FFI trap source is available at $(JAVA_DIR)/FfiTrapDemo.java"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # LLVM Bitcode — Per-Language Targets
@@ -498,6 +479,7 @@ LLVM_BC_FILES := \
 	$(BUILD_DIR)/cpp/fft.bc \
 	$(BUILD_DIR)/c/hash_c_bridge.bc \
 	$(BUILD_DIR)/c/fft_c_bridge.bc \
+	$(BUILD_DIR)/c/ffi_traps.bc \
 	$(BUILD_DIR)/c/merkle_tree.bc \
 	$(BUILD_DIR)/rust_hash/rust_hash.bc \
 	$(BUILD_DIR)/rust_merkle/rust_merkle.bc \
@@ -540,6 +522,7 @@ OUTPUT_BC_FILES := \
 	$(OUTPUT_DIR)/cpp_fft.bc \
 	$(OUTPUT_DIR)/c_hash_c_bridge.bc \
 	$(OUTPUT_DIR)/c_fft_c_bridge.bc \
+	$(OUTPUT_DIR)/c_ffi_traps.bc \
 	$(OUTPUT_DIR)/c_merkle_tree.bc \
 	$(OUTPUT_DIR)/rust_hash.bc \
 	$(OUTPUT_DIR)/rust_merkle.bc \
@@ -583,6 +566,12 @@ $(OUTPUT_DIR)/c_fft_c_bridge.bc: $(C_FFT_BRIDGE_BC) | $(OUTPUT_DIR)/
 $(OUTPUT_DIR)/c_fft_c_bridge.ll: $(C_FFT_BRIDGE_LL) | $(OUTPUT_DIR)/
 	cp $< $@
 
+$(OUTPUT_DIR)/c_ffi_traps.bc: $(FFI_TRAPS_BC) | $(OUTPUT_DIR)/
+	cp $< $@
+
+$(OUTPUT_DIR)/c_ffi_traps.ll: $(FFI_TRAPS_LL) | $(OUTPUT_DIR)/
+	cp $< $@
+
 $(OUTPUT_DIR)/c_merkle_tree.bc: $(C_MERKLE_BC) | $(OUTPUT_DIR)/
 	cp $< $@
 
@@ -618,7 +607,7 @@ $(OUTPUT_DIR)/zig_main.ll: $(ZIG_MAIN_LL) | $(OUTPUT_DIR)/
 # ═══════════════════════════════════════════════════════════════════════════════
 # ───────────────────────────────────────────────────────────────────────────────
 
-check: $(C_MERKLE_BIN) $(RUST_MERKLE_BIN) $(GO_BIN) $(SWIFT_BIN) $(PYTHON_LIB) $(ZIG_BIN) $(LLVM_OUTPUT)
+check: $(C_MERKLE_BIN) $(RUST_MERKLE_BIN) $(GO_BIN) $(PYTHON_LIB) $(ZIG_BIN) java $(LLVM_OUTPUT)
 	@echo ""
 	@echo "═══ Testing C Merkle Tree + FFT ═══"
 	$(C_MERKLE_BIN) || echo "C binary returned $?"
@@ -629,14 +618,14 @@ check: $(C_MERKLE_BIN) $(RUST_MERKLE_BIN) $(GO_BIN) $(SWIFT_BIN) $(PYTHON_LIB) $
 	@echo "═══ Testing Go Merkle Tree + FFT (complex chain) ═══"
 	$(GO_BIN) || echo "Go binary returned $?"
 	@echo ""
-	@echo "═══ Testing Swift Merkle Tree + FFT ═══"
-	$(SWIFT_BIN) || echo "Swift binary returned $?"
-	@echo ""
 	@echo "═══ Testing Python Merkle Tree + FFT ═══"
 	cd $(PYTHON_DIR) && $(PYTHON) merkle_tree.py --lib ../$(PYTHON_LIB) || echo "Python returned $$?"
 	@echo ""
 	@echo "═══ Testing Zig FFI Bug Demo ═══"
 	$(ZIG_BIN) || echo "Zig binary returned $?"
+	@echo ""
+	@echo "═══ Java FFI Trap Demo ═══"
+	@echo "Source-only sample: $(JAVA_DIR)/FfiTrapDemo.java"
 	@echo ""
 	@echo "═══ LLVM Bitcode in $(OUTPUT_DIR)/ ═══"
 	@for f in $(OUTPUT_BC_FILES); do \

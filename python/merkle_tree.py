@@ -84,6 +84,46 @@ def _setup_functions(lib: ctypes.CDLL) -> None:
     lib.c_fft_test_signal.argtypes = [ctypes.c_char_p, ctypes.c_size_t]
     lib.c_fft_test_signal.restype = None
 
+    lib.ffi_make_token.argtypes = [ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
+    lib.ffi_make_token.restype = ctypes.c_void_p
+    lib.ffi_release_token.argtypes = [ctypes.c_void_p]
+    lib.ffi_release_token.restype = None
+    lib.ffi_borrowed_label.argtypes = [ctypes.POINTER(ctypes.c_size_t)]
+    lib.ffi_borrowed_label.restype = ctypes.c_void_p
+    lib.ffi_copy_message.argtypes = [
+        ctypes.c_char_p,
+        ctypes.c_uint32,
+        ctypes.c_void_p,
+        ctypes.c_uint32,
+    ]
+    lib.ffi_copy_message.restype = ctypes.c_int
+
+
+def ffi_trap_demo(lib: ctypes.CDLL) -> None:
+    """Exercise deliberately subtle FFI ownership and length bugs."""
+    print("=== Python FFI Trap Demo ===")
+
+    seed = (ctypes.c_uint8 * 4)(0x10, 0x20, 0x30, 0x40)
+    token = lib.ffi_make_token(seed, 4)
+    if token:
+        text = ctypes.string_at(token).decode("ascii")
+        print(f"token: {text}")
+        # BUG[PY-FFI-1]: The owning C malloc pointer is converted to Python data,
+        # but ffi_release_token is intentionally skipped on the normal path.
+
+    label_len = ctypes.c_size_t()
+    label = lib.ffi_borrowed_label(ctypes.byref(label_len))
+    print("borrowed label:", ctypes.string_at(label, label_len.value).decode("ascii"))
+    # BUG[PY-FFI-2]: Borrowed static storage is released through the owning free
+    # API because both functions expose indistinguishable c_void_p values.
+    if os.environ.get("FFI_DEMO_TRIGGER_INVALID_FREE") == "1":
+        lib.ffi_release_token(label)
+
+    msg = b"exactly-16-bytes"
+    out = ctypes.create_string_buffer(len(msg))
+    # BUG[PY-FFI-3]: Exact-size buffer leaves no room for the C terminator write.
+    lib.ffi_copy_message(msg, len(msg), out, len(msg))
+
 
 def sha256(data: bytes, lib: ctypes.CDLL) -> bytes:
     """Compute SHA-256 hash via the C bridge FFI.
@@ -232,6 +272,10 @@ def main():
 
     # ─── FFT Demo ───
     fft_demo(lib)
+
+    # ─── FFI Trap Demo ───
+    print()
+    ffi_trap_demo(lib)
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@
 
 const c = @cImport({
     @cInclude("zig_ffi_bridge.h");
+    @cInclude("ffi_traps.h");
     @cInclude("stdlib.h");
     @cInclude("string.h");
 });
@@ -127,6 +128,31 @@ fn memoryLeakDemo() void {
     std.debug.print("leaked buffer first byte: {d}\n", .{ptr[0]});
 }
 
+fn subtleFfiTrapDemo() void {
+    var seed = [_]u8{ 0x10, 0x20, 0x30, 0x40 };
+    const token = c.ffi_make_token(&seed, seed.len);
+    if (token != null) {
+        std.debug.print("token first byte: {d}\n", .{token[0]});
+        // BUG[ZIG-FFI-7]: C malloc-owned token is treated as a borrowed C string;
+        // the normal path skips ffi_release_token after copying/printing.
+    }
+
+    var label_len: usize = 0;
+    const label = c.ffi_borrowed_label(&label_len);
+    std.debug.print("borrowed label len: {d}\n", .{label_len});
+    // BUG[ZIG-FFI-8]: Borrowed static storage is cast away and passed to the
+    // owning C release function because the API shape mirrors ffi_make_token.
+    if (c.getenv("FFI_DEMO_TRIGGER_INVALID_FREE") != null) {
+        c.ffi_release_token(@constCast(label));
+    }
+
+    var msg = [_]u8{ 'e', 'x', 'a', 'c', 't', 'l', 'y', '-', '1', '6', '-', 'b', 'y', 't', 'e', 's' };
+    var out: [16]u8 = undefined;
+    // BUG[ZIG-FFI-9]: Exact-size output and usize->u32 narrowing hide C's
+    // off-by-one terminator write at the FFI boundary.
+    _ = c.ffi_copy_message(@ptrCast(&msg), @intCast(msg.len), @ptrCast(&out), @intCast(out.len));
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Entry point
 // ─────────────────────────────────────────────────────────────────────
@@ -151,6 +177,9 @@ pub fn main() void {
 
     std.debug.print("[6] Memory leak (never freed)...\n", .{});
     memoryLeakDemo();
+
+    std.debug.print("[7] Subtle ownership/length traps...\n", .{});
+    subtleFfiTrapDemo();
 
     std.debug.print("\n=== Done ===\n", .{});
 }

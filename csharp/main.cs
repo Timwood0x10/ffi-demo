@@ -30,6 +30,18 @@ public static class NativeMethods {
     // C++ functions
     [DllImport("libcpp_fft", CallingConvention = CallingConvention.Cdecl)]
     public static extern int c_fft_forward(IntPtr real, IntPtr imag, int n);
+
+    [DllImport("libffi_traps", CallingConvention = CallingConvention.Cdecl)]
+    public static extern IntPtr ffi_make_token(IntPtr seed, UIntPtr len);
+
+    [DllImport("libffi_traps", CallingConvention = CallingConvention.Cdecl)]
+    public static extern void ffi_release_token(IntPtr token);
+
+    [DllImport("libffi_traps", CallingConvention = CallingConvention.Cdecl)]
+    public static extern IntPtr ffi_borrowed_label(out UIntPtr len);
+
+    [DllImport("libffi_traps", CallingConvention = CallingConvention.Cdecl)]
+    public static extern int ffi_copy_message(IntPtr message, uint len, IntPtr outBuf, uint outLen);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -144,6 +156,37 @@ public class SafeCorrectPairDemo {
     }
 }
 
+public class SubtleFfiTrapDemo {
+    public static unsafe void Run() {
+        byte[] seed = new byte[] { 0x10, 0x20, 0x30, 0x40 };
+        fixed (byte* seedPtr = seed) {
+            IntPtr token = NativeMethods.ffi_make_token((IntPtr)seedPtr, (UIntPtr)seed.Length);
+            if (token != IntPtr.Zero) {
+                Console.WriteLine(Marshal.PtrToStringAnsi(token));
+                // BUG[CS-FFI-5]: C malloc-owned token is copied to managed string,
+                // but the original pointer is never released on the normal path.
+            }
+        }
+
+        UIntPtr labelLen;
+        IntPtr label = NativeMethods.ffi_borrowed_label(out labelLen);
+        Console.WriteLine(Marshal.PtrToStringAnsi(label, (int)labelLen));
+        // BUG[CS-FFI-6]: Borrowed static storage is sent to an owning free API.
+        if (Environment.GetEnvironmentVariable("FFI_DEMO_TRIGGER_INVALID_FREE") == "1")
+            NativeMethods.ffi_release_token(label);
+
+        byte[] message = System.Text.Encoding.ASCII.GetBytes("exactly-16-bytes");
+        IntPtr input = Marshal.AllocHGlobal(message.Length);
+        IntPtr output = Marshal.AllocHGlobal(message.Length);
+        Marshal.Copy(message, 0, input, message.Length);
+        // BUG[CS-FFI-7]: Exact-sized output buffer leaves no byte for C's hidden
+        // NUL write; managed uint length also masks native size_t expectations.
+        NativeMethods.ffi_copy_message(input, (uint)message.Length, output, (uint)message.Length);
+        Marshal.FreeHGlobal(input);
+        Marshal.FreeHGlobal(output);
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Main entry point
 // ─────────────────────────────────────────────────────────────────────────────
@@ -168,6 +211,9 @@ class Program {
 
         Console.WriteLine("--- SAFE: Correct pair ---");
         SafeCorrectPairDemo.Run();
+
+        Console.WriteLine("--- CS-FFI: Subtle ownership/layout traps ---");
+        SubtleFfiTrapDemo.Run();
 
         Console.WriteLine("Done.");
         return 0;

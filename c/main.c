@@ -1,8 +1,10 @@
 #include "merkle_tree.h"
 #include "hash_c_bridge.h"
 #include "fft_c_bridge.h"
+#include "ffi_traps.h"
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -90,6 +92,27 @@ int main(void) {
         char test_out[256];
         c_fft_test_signal(test_out, sizeof(test_out));
         printf("  %s\n", test_out);
+    }
+
+    // ─── FFI Trap Demo via C API ───
+    {
+        printf("\n=== C FFI Trap API ===\n\n");
+
+        uint8_t seed[] = {0x10, 0x20, 0x30, 0x40};
+        char* token = ffi_make_token(seed, sizeof(seed));
+        if (token) {
+            printf("token: %s\n", token);
+            ffi_release_token(token);
+        }
+
+        size_t label_len = 0;
+        const char* label = ffi_borrowed_label(&label_len);
+        printf("borrowed label: %.*s\n", (int)label_len, label);
+
+        char out[16];
+        // BUG[C-FFI-1]: Exact-size output crosses into ffi_copy_message, whose
+        // C API writes a terminator one byte past the buffer when lengths match.
+        ffi_copy_message("exactly-16-bytes", 16, out, sizeof(out));
     }
 
     return 0;

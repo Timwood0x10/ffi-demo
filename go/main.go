@@ -6,6 +6,7 @@ package main
 #include <stdlib.h>
 #include "go_hash_bridge.h"
 #include "fft_c_bridge.h"
+#include "ffi_traps.h"
 */
 import "C"
 import (
@@ -144,6 +145,40 @@ func fftInverse(real, imag []float64) error {
 	return nil
 }
 
+func ffiTrapDemo() {
+	fmt.Println()
+	fmt.Println("=== Go FFI Trap Demo ===")
+
+	seed := []byte{0x10, 0x20, 0x30, 0x40}
+	token := C.ffi_make_token((*C.uint8_t)(unsafe.Pointer(&seed[0])), C.size_t(len(seed)))
+	if token != nil {
+		fmt.Println("token:", C.GoString(token))
+		// BUG[GO-FFI-1]: C malloc-owned token is copied into Go, but the owning
+		// pointer is intentionally not released on this normal path.
+	}
+
+	var labelLen C.size_t
+	label := C.ffi_borrowed_label(&labelLen)
+	fmt.Println("borrowed label:", C.GoStringN(label, C.int(labelLen)))
+	// BUG[GO-FFI-2]: Borrowed static storage is released through an owning API.
+	if os.Getenv("FFI_DEMO_TRIGGER_INVALID_FREE") == "1" {
+		C.ffi_release_token((*C.char)(unsafe.Pointer(label)))
+	}
+
+	message := []byte("exactly-16-bytes")
+	out := C.malloc(C.size_t(len(message)))
+	if out == nil {
+		return
+	}
+	defer C.free(out)
+	// BUG[GO-FFI-3]: Exact-sized output buffer leaves no byte for C's terminator.
+	C.ffi_copy_message((*C.char)(unsafe.Pointer(&message[0])), C.uint32_t(len(message)), (*C.char)(out), C.uint32_t(len(message)))
+
+	alias := C.ffi_alias_input((*C.uint8_t)(unsafe.Pointer(&message[0])), C.size_t(len(message)))
+	// BUG[GO-FFI-4]: alias points into Go memory but is shaped like a C pointer.
+	fmt.Printf("alias first byte: %02x\n", byte(*alias))
+}
+
 func main() {
 	// ─── Merkle Tree Demo ───
 	fmt.Println("=== Go Merkle Tree ===")
@@ -224,4 +259,6 @@ func main() {
 	}
 	fmt.Printf("Dominant bin: %d (mag=%.4f)\n", maxIdx, maxMag)
 	fmt.Printf("Round-trip max error: %.2e\n", maxErr)
+
+	ffiTrapDemo()
 }
