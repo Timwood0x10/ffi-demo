@@ -40,4 +40,19 @@ int c_apply_config(const void *config, size_t config_size);
 int c_fft_forward(double *real, double *imag, size_t n);
 int c_fft_inverse(double *real, double *imag, size_t n);
 
+// ── Additional bug scenarios for Zig FFI detection ──
+
+/// BUG[ZIG-CROSS-6]: Allocator mismatch. c_allocator alloc returns
+/// C_HEAP memory, but caller frees with Zig's allocator (cross-family).
+void* c_alloc_mismatch(size_t len);
+
+/// BUG[ZIG-LEAK-7]: Returns a C buffer that is never freed by Zig caller.
+void* c_parse_config(const char* key, size_t key_len);
+
+/// BUG[ZIG-UAF-8]: Explicit free then deferred callback uses freed memory.
+void c_defer_after_free(void *ptr);
+
+/// BUG[ZIG-ESCAPE-9]: GPA alloc, C stores pointer, Zig later frees (UAF).
+void c_register_and_store(void *ptr);
+
 #endif // ZIG_FFI_BRIDGE_H

@@ -54,6 +54,7 @@ GO_DIR        := go
 PYTHON_DIR    := python
 ZIG_DIR       := zig
 JAVA_DIR      := java
+CSHARP_DIR    := csharp
 
 # ─── LLVM Flags ──────────────────────────────────────────────────────────────
 LLVM_CFLAGS   := -O2 -emit-llvm
@@ -66,11 +67,11 @@ LLVM_OUTPUT   := llvm-output
 
 # ─── Targets ─────────────────────────────────────────────────────────────────
 .PHONY: all build-dirs clean
-.PHONY: cpp c rust-hash rust-merkle go python zig java
+.PHONY: cpp c rust-hash rust-merkle go python zig java csharp
 .PHONY: llvm-bitcode llvm-ir
 .PHONY: check test
 
-all: build-dirs cpp c rust-hash rust-merkle go python zig java llvm-bitcode $(LLVM_OUTPUT)
+all: build-dirs cpp c rust-hash rust-merkle go python zig java csharp llvm-bitcode $(LLVM_OUTPUT)
 	@echo ""
 	@echo "=== Build complete ==="
 	@echo "Run 'make check' to verify all outputs."
@@ -470,6 +471,31 @@ java: $(JAVA_DIR)/FfiTrapDemo.java | build-dirs
 	@echo "Java FFI trap source is available at $(JAVA_DIR)/FfiTrapDemo.java"
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# C# FFI Demo (.NET NativeAOT P/Invoke simulation)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Files: csharp/csharp_ffi_demo.c
+# Bugs: cross-language free, memory leak, COM free mismatch, double-free
+#       + 1 safe correct pair (no bug)
+#
+# Compiled as plain C with clang — the C source simulates the symbol names
+# that .NET NativeAOT P/Invoke produces (Marshal_AllocHGlobal, CoTaskMemAlloc,
+# etc.) so our classifier can recognize them.
+# ───────────────────────────────────────────────────────────────────────────────
+
+CSHARP_BC   := $(BUILD_DIR)/csharp/csharp_ffi_demo.bc
+CSHARP_LL   := $(BUILD_DIR)/csharp/csharp_ffi_demo.ll
+
+csharp: $(CSHARP_BC) $(CSHARP_LL)
+
+$(CSHARP_BC): $(CSHARP_DIR)/csharp_ffi_demo.c | build-dirs
+	$(MKDIR_P) $(BUILD_DIR)/csharp
+	$(CC) $(C_STD) $(LLVM_CFLAGS) -c -o $@ $<
+
+$(CSHARP_LL): $(CSHARP_DIR)/csharp_ffi_demo.c | build-dirs
+	$(MKDIR_P) $(BUILD_DIR)/csharp
+	$(CC) $(C_STD) $(LLVM_CFLAGS) -S -c -o $@ $<
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # LLVM Bitcode — Per-Language Targets
 # ═══════════════════════════════════════════════════════════════════════════════
 # ───────────────────────────────────────────────────────────────────────────────
@@ -527,7 +553,8 @@ OUTPUT_BC_FILES := \
 	$(OUTPUT_DIR)/rust_hash.bc \
 	$(OUTPUT_DIR)/rust_merkle.bc \
 	$(OUTPUT_DIR)/zig_ffi_bridge.bc \
-	$(OUTPUT_DIR)/zig_main.bc
+	$(OUTPUT_DIR)/zig_main.bc \
+	$(OUTPUT_DIR)/csharp_ffi_demo.bc
 
 OUTPUT_IR_FILES := $(OUTPUT_BC_FILES:.bc=.ll)
 
@@ -600,6 +627,12 @@ $(OUTPUT_DIR)/zig_main.bc: $(ZIG_MAIN_BC) | $(OUTPUT_DIR)/
 	cp $< $@
 
 $(OUTPUT_DIR)/zig_main.ll: $(ZIG_MAIN_LL) | $(OUTPUT_DIR)/
+	cp $< $@
+
+$(OUTPUT_DIR)/csharp_ffi_demo.bc: $(CSHARP_BC) | $(OUTPUT_DIR)/
+	cp $< $@
+
+$(OUTPUT_DIR)/csharp_ffi_demo.ll: $(CSHARP_LL) | $(OUTPUT_DIR)/
 	cp $< $@
 
 # ═══════════════════════════════════════════════════════════════════════════════

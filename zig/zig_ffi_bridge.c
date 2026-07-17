@@ -46,3 +46,38 @@ int c_apply_config(const void *config, size_t config_size) {
 
 // Note: c_fft_forward / c_fft_inverse are provided by fft_c_bridge.c
 // and linked at final link time. Not declared here to avoid conflicts.
+
+// ── Additional bug scenarios for Zig FFI detection ──
+
+static void* g_stored_ptr = NULL;
+
+// BUG[ZIG-CROSS-6]: Allocator mismatch. Allocates with malloc (C_HEAP)
+// but Zig caller will free with its own allocator (ZIG_ALLOCATOR family).
+void* c_alloc_mismatch(size_t len) {
+    return malloc(len);
+}
+
+// BUG[ZIG-LEAK-7]: Returns a C buffer that is never freed by the Zig caller.
+// The contract says "caller must free with C free", but Zig doesn't call free.
+void* c_parse_config(const char* key, size_t key_len) {
+    (void)key;
+    (void)key_len;
+    void* buf = malloc(256);
+    return buf;
+}
+
+// BUG[ZIG-UAF-8]: Frees the pointer, then a deferred callback
+// attempts to use the freed memory.
+void c_defer_after_free(void *ptr) {
+    free(ptr);
+    // After free, the deferred callback in Zig may still reference ptr
+    // This is a use-after-free across the FFI boundary
+}
+
+// BUG[ZIG-ESCAPE-9]: Stores the pointer globally; Zig later frees
+// the allocation, but C still holds a reference (UAF).
+void c_register_and_store(void *ptr) {
+    g_stored_ptr = ptr;
+    // C now holds a reference; if Zig frees the allocation,
+    // g_stored_ptr becomes a dangling pointer
+}

@@ -108,3 +108,36 @@ uint8_t* ffi_alias_input(uint8_t* data, size_t len) {
     // after the original slice/list/object has moved or died.
     return data + (len / 2);
 }
+
+// ── Additional bug scenarios for cross-family / UAF / double-free detection ──
+
+void* cross_family_alloc(void) {
+    // BUG[TRAP-C-8]: Allocates with malloc (C_HEAP family) but caller
+    // is expected to release with operator delete (CPP_NEW_SCALAR family).
+    // This is a cross-family deallocation mismatch.
+    void* ptr = malloc(64);
+    return ptr;
+}
+
+void uaf_through_ffi(void) {
+    // BUG[TRAP-C-9]: Use-after-free through FFI. Allocates, frees,
+    // then passes the dangling pointer to an FFI callback that reads it.
+    char* buf = (char*)malloc(32);
+    if (!buf) return;
+    snprintf(buf, 32, "test-data");
+    free(buf);
+    // BUG: uses freed memory via FFI callback
+    if (g_callback) {
+        g_callback(g_user_data, buf, 32);  // UAF: buf is already freed
+    }
+}
+
+void leaked_callback_userdata(void) {
+    // BUG[TRAP-C-11]: Heap-allocated userdata passed to callback
+    // registration that never frees it. This is a memory leak.
+    void* userdata = malloc(128);
+    if (!userdata) return;
+    // Register without transfer of ownership — nobody will free this
+    ffi_register_callback(NULL, userdata);
+    // BUG: userdata is never freed after registration
+}

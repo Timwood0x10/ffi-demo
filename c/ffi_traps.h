@@ -26,6 +26,21 @@ void ffi_register_callback(ffi_event_cb cb, void* user_data);
 void ffi_fire_deferred_callback(void);
 uint8_t* ffi_alias_input(uint8_t* data, size_t len);
 
+
+// ── Additional bug scenarios for cross-family / UAF / double-free detection ──
+
+/// BUG[TRAP-C-8]: Cross-family free. Allocates with malloc (C_HEAP)
+/// but the caller is expected to release with operator delete (CPP_NEW_SCALAR).
+void* cross_family_alloc(void);
+
+/// BUG[TRAP-C-9]: Use-after-free through FFI. Frees a buffer then
+/// passes the dangling pointer to an FFI callback that reads it.
+void uaf_through_ffi(void);
+
+/// BUG[TRAP-C-11]: Leaked callback userdata. Heap-allocated userdata
+/// passed to a callback registration that never frees it.
+void leaked_callback_userdata(void);
+
 #ifdef __cplusplus
 }
 #endif
